@@ -169,14 +169,17 @@ class AlpacaMarketDataProvider(MarketDataProvider):
     ) -> dict:
         tf_map = {"1Min": "1Min", "1Hour": "1Hour", "1Day": "1Day"}
         try:
+            from typing import Any, cast
+
             from alpaca.data.requests import StockBarsRequest
             from alpaca.data.timeframe import TimeFrame
 
-            tf = TimeFrame.Minute if timeframe == "1Min" else (
-                TimeFrame.Hour if timeframe == "1Hour" else TimeFrame.Day
+            tf = cast(
+                Any,
+                TimeFrame.Minute
+                if timeframe == "1Min"
+                else (TimeFrame.Hour if timeframe == "1Hour" else TimeFrame.Day),
             )
-            from typing import cast
-
             from alpaca.data.models import DataFeed  # type: ignore[attr-defined]
 
             req = StockBarsRequest(
@@ -200,11 +203,13 @@ class AlpacaMarketDataProvider(MarketDataProvider):
     @staticmethod
     def _extract(resp: object, symbol: str) -> list[dict]:
         """Normalize alpaca-py response shapes ({sym: [...]}, BarSet, dicts)."""
+        from typing import Any, cast
+
         if isinstance(resp, dict):
-            data = resp.get(symbol.upper(), resp)
+            data: Any = resp.get(symbol.upper(), resp)
         else:
             data = getattr(resp, "data", resp)
-        if hasattr(data, "get"):  # mapping of symbol -> rows
+        if isinstance(data, dict):  # mapping of symbol -> rows
             rows = data.get(symbol.upper(), [])
         elif isinstance(data, list):
             rows = data

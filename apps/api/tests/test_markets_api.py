@@ -185,7 +185,7 @@ async def test_snapshot_missing_symbol_is_missing_state(monkeypatch) -> None:
 def test_no_order_endpoints() -> None:
     from app.main import create_app
 
-    paths = {r.path for r in create_app().routes}
+    paths = {getattr(r, "path", "") for r in create_app().routes}
     market_paths = [p for p in paths if p.startswith("/markets")]
     assert market_paths
     for p in market_paths:

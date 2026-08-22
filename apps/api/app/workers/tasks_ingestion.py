@@ -64,6 +64,7 @@ def run_ingestion_bars(
     from market_data.cache import _key
     from market_data.validation import validate_bar
 
+    assert provider is not None, "provider is required"
     received = datetime.now(UTC)
     fetched = provider.get_bars(symbol, timeframe=timeframe)
     _log_event(
@@ -106,6 +107,7 @@ def run_ingestion_bars(
 def run_ingestion_quotes(symbol: str, provider=None, repo_factory=None, cache=None) -> dict:
     from market_data.validation import validate_quote
 
+    assert provider is not None, "provider is required"
     quote = provider.get_latest_quote(symbol)
     fetched = 1 if quote else 0
     persisted = 0
@@ -122,6 +124,8 @@ def run_ingestion_quotes(symbol: str, provider=None, repo_factory=None, cache=No
             "received_at": quote.received_at,
         }
 
+        assert repo_factory is not None, "repo_factory is required"
+
         async def _go():
             async with repo_factory() as session:
                 from app.db.repositories.market_data_repo import QuoteRepository
@@ -137,6 +141,7 @@ def run_ingestion_quotes(symbol: str, provider=None, repo_factory=None, cache=No
 def run_ingestion_trades(symbol: str, limit: int = 50, provider=None, repo_factory=None) -> dict:
     from market_data.validation import validate_trade
 
+    assert provider is not None, "provider is required"
     trades = provider.get_recent_trades(symbol, limit=limit)
     rows = []
     invalid = 0
@@ -155,6 +160,8 @@ def run_ingestion_trades(symbol: str, limit: int = 50, provider=None, repo_facto
             "received_at": t.received_at,
         })
 
+    assert repo_factory is not None, "repo_factory is required"
+
     async def _go():
         async with repo_factory() as session:
             from app.db.repositories.market_data_repo import TradeRepository
@@ -170,6 +177,7 @@ def run_ingestion_news(limit: int = 50, symbols: list[str] | None = None,
                        provider=None, repo_factory=None) -> dict:
     from market_data.validation import validate_news
 
+    assert provider is not None, "provider is required"
     articles = provider.get_news(symbols=symbols, limit=limit)
     rows = []
     invalid = 0
@@ -189,6 +197,8 @@ def run_ingestion_news(limit: int = 50, symbols: list[str] | None = None,
             "received_at": n.received_at,
         })
 
+    assert repo_factory is not None, "repo_factory is required"
+
     async def _go():
         async with repo_factory() as session:
             from app.db.repositories.market_data_repo import NewsRepository
@@ -202,6 +212,7 @@ def run_ingestion_news(limit: int = 50, symbols: list[str] | None = None,
 
 
 def run_ingestion_security_metadata(symbol: str, provider=None, repo_factory=None) -> dict:
+    assert provider is not None, "provider is required"
     security = provider.get_security(symbol)
     if security is None:
         return {"symbol": symbol, "datatype": "security_metadata",
@@ -215,6 +226,8 @@ def run_ingestion_security_metadata(symbol: str, provider=None, repo_factory=Non
         "provider": security.provider_info.provider,
         "received_at": security.received_at,
     }
+
+    assert repo_factory is not None, "repo_factory is required"
 
     async def _go():
         async with repo_factory() as session:
