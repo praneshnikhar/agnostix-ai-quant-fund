@@ -9,18 +9,18 @@ deterministic failure. The critic never rewrites the thesis.
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from agents.contracts import AgentRole, AgentSpec, ToolPermission
+from agents.contracts import AgentRole, AgentSpec
 from agents.events import EventEmitter
 from agents.roles import CriticAgent
 from fundamentals.context import FundamentalResearchContext
 from fundamentals.research.grounding import run_deterministic_checks
 from fundamentals.research.schemas import (
     ClaimCheck,
-    ClaimCheckStatus,
     CriticFinding,
     CriticReviewOutput,
     InvestmentThesis,
@@ -28,6 +28,8 @@ from fundamentals.research.schemas import (
 )
 
 PROMPT_VERSION = "m2-critic-v1"
+
+logger = logging.getLogger(__name__)
 
 CRITIC_SYSTEM_PROMPT = """You are an independent research critic. You did NOT
 write the thesis under review.
@@ -124,13 +126,17 @@ class FundamentalResearchCritic(CriticAgent):
                             findings.append(CriticFinding.model_validate(f))
                         except ValidationError:
                             continue
-                    provider = getattr(response, "provider", None) or (response.get("provider") if isinstance(response, dict) else None)
-                    model = getattr(response, "model", None) or (response.get("model") if isinstance(response, dict) else None)
+                    provider = getattr(response, "provider", None) or (
+                        response.get("provider") if isinstance(response, dict) else None
+                    )
+                    model = getattr(response, "model", None) or (
+                        response.get("model") if isinstance(response, dict) else None
+                    )
                     llm_provider = str(getattr(provider, "value", provider)) if provider else None
                     llm_model = str(model) if model else None
-            except Exception:
+            except Exception as exc:  # noqa: BLE001
                 # LLM critic unavailability must not block deterministic verdict.
-                pass
+                logger.warning("critic_llm_review_failed: %s", exc)
 
         review = CriticReviewOutput(
             verdict=verdict,
@@ -153,8 +159,12 @@ class FundamentalResearchCritic(CriticAgent):
 
 
 def _extract(response: Any) -> dict | None:
-    raw = getattr(response, "content", None) or (response.get("content") if isinstance(response, dict) else None)
-    structured = getattr(response, "structured", None) or (response.get("structured") if isinstance(response, dict) else None)
+    raw = getattr(response, "content", None) or (
+        response.get("content") if isinstance(response, dict) else None
+    )
+    structured = getattr(response, "structured", None) or (
+        response.get("structured") if isinstance(response, dict) else None
+    )
     if isinstance(structured, dict):
         return structured
     if raw:

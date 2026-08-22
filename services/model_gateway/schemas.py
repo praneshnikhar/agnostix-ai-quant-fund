@@ -18,10 +18,10 @@ from pydantic import BaseModel, Field
 class ModelClass(StrEnum):
     """Coarse workload classes used for routing decisions."""
 
-    REASONING = "reasoning"      # strong reasoning models (committee, analysis)
-    STANDARD = "standard"        # general-purpose tasks
-    CHEAP = "cheap"              # extraction, classification, high-frequency
-    EMBEDDING = "embedding"      # vector embeddings
+    REASONING = "reasoning"  # strong reasoning models (committee, analysis)
+    STANDARD = "standard"  # general-purpose tasks
+    CHEAP = "cheap"  # extraction, classification, high-frequency
+    EMBEDDING = "embedding"  # vector embeddings
 
 
 class ProviderName(StrEnum):
@@ -38,10 +38,10 @@ class Message(BaseModel):
 class ModelRequest(BaseModel):
     """A single gateway call. `task` enables routing + cost attribution."""
 
-    task: str                       # e.g. fundamental_analysis, news_extraction
+    task: str  # e.g. fundamental_analysis, news_extraction
     model_class: ModelClass
     messages: list[Message]
-    response_schema: dict[str, Any] | None = None   # JSON-schema hint for structured output
+    response_schema: dict[str, Any] | None = None  # JSON-schema hint for structured output
     prompt_version: str = "v0"
     max_tokens: int | None = None
     temperature: float | None = None

@@ -30,21 +30,62 @@ def seeded(monkeypatch):
     """Patch repositories used by the markets routes with in-memory fakes."""
     from app.api.routes import markets as m
 
-    sec = _Rec(symbol="AAPL", name="Apple Inc.", exchange="NASDAQ",
-               asset_class="us_equity", status="active", provider="alpaca_market_data",
-               received_at=T0)
-    bar = _Rec(symbol="AAPL", timeframe="1Day", event_time=T0, open=100, high=110,
-               low=99, close=105, volume=1000, trade_count=10, vwap=104,
-               provider="alpaca_market_data", received_at=T0)
-    quote = _Rec(symbol="AAPL", event_time=T0, bid_price=99.9, bid_size=1,
-                 ask_price=100.1, ask_size=1, last_price=None,
-                 provider="alpaca_market_data", received_at=T0)
-    trade = _Rec(symbol="AAPL", event_time=T0, price=105, size=10, conditions=None,
-                 provider="alpaca_market_data", provider_trade_id="T1", received_at=T0)
-    news = _Rec(id=1, headline="h", summary=None, source="Reuters",
-                url="https://x", symbols=["AAPL"], published_at=T0,
-                received_at=T0, provider="alpaca_news",
-                provider_article_id="n-1")
+    sec = _Rec(
+        symbol="AAPL",
+        name="Apple Inc.",
+        exchange="NASDAQ",
+        asset_class="us_equity",
+        status="active",
+        provider="alpaca_market_data",
+        received_at=T0,
+    )
+    bar = _Rec(
+        symbol="AAPL",
+        timeframe="1Day",
+        event_time=T0,
+        open=100,
+        high=110,
+        low=99,
+        close=105,
+        volume=1000,
+        trade_count=10,
+        vwap=104,
+        provider="alpaca_market_data",
+        received_at=T0,
+    )
+    quote = _Rec(
+        symbol="AAPL",
+        event_time=T0,
+        bid_price=99.9,
+        bid_size=1,
+        ask_price=100.1,
+        ask_size=1,
+        last_price=None,
+        provider="alpaca_market_data",
+        received_at=T0,
+    )
+    trade = _Rec(
+        symbol="AAPL",
+        event_time=T0,
+        price=105,
+        size=10,
+        conditions=None,
+        provider="alpaca_market_data",
+        provider_trade_id="T1",
+        received_at=T0,
+    )
+    news = _Rec(
+        id=1,
+        headline="h",
+        summary=None,
+        source="Reuters",
+        url="https://x",
+        symbols=["AAPL"],
+        published_at=T0,
+        received_at=T0,
+        provider="alpaca_news",
+        provider_article_id="n-1",
+    )
 
     class R:
         def __init__(self, *a) -> None:
@@ -174,8 +215,13 @@ async def test_snapshot_missing_symbol_is_missing_state(monkeypatch) -> None:
 
     from app.db.repositories import market_data_repo as repo_mod
 
-    for name in ("SecurityRepository", "BarRepository", "QuoteRepository",
-                 "TradeRepository", "NewsRepository"):
+    for name in (
+        "SecurityRepository",
+        "BarRepository",
+        "QuoteRepository",
+        "TradeRepository",
+        "NewsRepository",
+    ):
         monkeypatch.setattr(repo_mod, name, Empty)
     snap = await build_snapshot(FakeSession(), "AAPL")
     assert all(d.state.value == "missing" for d in snap.data_quality)

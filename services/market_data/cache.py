@@ -50,9 +50,7 @@ class RedisCache(_NoopCache):
             return None  # malformed/foreign entry treated as miss
         return entry["payload"]
 
-    async def set_json(
-        self, key: str, value: Any, ttl_seconds: int = DEFAULT_TTL_SECONDS
-    ) -> None:
+    async def set_json(self, key: str, value: Any, ttl_seconds: int = DEFAULT_TTL_SECONDS) -> None:
         entry = {
             "received_at": datetime.now(UTC).isoformat(),
             "payload": value,

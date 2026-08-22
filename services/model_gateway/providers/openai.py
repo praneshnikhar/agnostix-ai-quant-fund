@@ -46,9 +46,7 @@ class OpenAIAdapter(ProviderAdapter):
 
         payload: dict[str, object] = {
             "model": self._model_for(request.model_class),
-            "messages": [
-                {"role": m.role, "content": m.content} for m in request.messages
-            ],
+            "messages": [{"role": m.role, "content": m.content} for m in request.messages],
         }
         if request.max_tokens is not None:
             payload["max_tokens"] = request.max_tokens

@@ -48,9 +48,7 @@ class AnthropicAdapter(ProviderAdapter):
 
         system_text = chr(10).join(m.content for m in request.messages if m.role == "system")
         chat_messages = [
-            {"role": m.role, "content": m.content}
-            for m in request.messages
-            if m.role != "system"
+            {"role": m.role, "content": m.content} for m in request.messages if m.role != "system"
         ]
 
         payload: dict[str, object] = {
@@ -83,16 +81,14 @@ class AnthropicAdapter(ProviderAdapter):
             request_id=uuid.uuid4(),
             provider=ProviderName.ANTHROPIC,
             model=str(data.get("model", "unknown")),
-            content="".join(
-                block.get("text", "") for block in data.get("content", [])
-            ),
+            content="".join(block.get("text", "") for block in data.get("content", [])),
             usage=Usage(
                 prompt_tokens=usage_raw.get("input_tokens"),
                 completion_tokens=usage_raw.get("output_tokens"),
                 total_tokens=(
-                    (usage_raw.get("input_tokens") or 0)
-                    + (usage_raw.get("output_tokens") or 0)
-                ) or None,
+                    (usage_raw.get("input_tokens") or 0) + (usage_raw.get("output_tokens") or 0)
+                )
+                or None,
             ),
             latency_ms=latency_ms,
         )

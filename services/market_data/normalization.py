@@ -101,13 +101,9 @@ def normalize_bar(raw: dict[str, Any], provider: str, received_at: datetime) -> 
         close=_to_float(_require(raw, "c", "close"), "close"),
         volume=_to_float(_require(raw, "v", "volume"), "volume"),
         trade_count=(
-            _to_int(v, "trade_count")
-            if (v := _get(raw, "n", "trade_count")) is not None
-            else None
+            _to_int(v, "trade_count") if (v := _get(raw, "n", "trade_count")) is not None else None
         ),
-        vwap=(
-            _to_float(v, "vwap") if (v := _get(raw, "vw", "vwap")) is not None else None
-        ),
+        vwap=(_to_float(v, "vwap") if (v := _get(raw, "vw", "vwap")) is not None else None),
         provider_info=ProviderInfo(provider=provider),
         received_at=received_at,
     )
@@ -124,9 +120,7 @@ def normalize_quote(raw: dict[str, Any], provider: str, received_at: datetime) -
             else None
         ),
         ask_size=(
-            _to_float(v, "ask_size")
-            if (v := _get(raw, "as", "ask_size")) is not None
-            else None
+            _to_float(v, "ask_size") if (v := _get(raw, "as", "ask_size")) is not None else None
         ),
         bid_price=(
             _to_float(v, "bid_price")
@@ -134,14 +128,10 @@ def normalize_quote(raw: dict[str, Any], provider: str, received_at: datetime) -
             else None
         ),
         bid_size=(
-            _to_float(v, "bid_size")
-            if (v := _get(raw, "bs", "bid_size")) is not None
-            else None
+            _to_float(v, "bid_size") if (v := _get(raw, "bs", "bid_size")) is not None else None
         ),
         last_price=(
-            _to_float(v, "last_price")
-            if (v := _get(raw, "last_price", "px")) is not None
-            else None
+            _to_float(v, "last_price") if (v := _get(raw, "last_price", "px")) is not None else None
         ),
         provider_info=ProviderInfo(provider=provider),
         received_at=received_at,
@@ -161,9 +151,7 @@ def normalize_trade(raw: dict[str, Any], provider: str, received_at: datetime) -
         price=_to_float(_require(raw, "p", "price"), "price"),
         size=_to_float(_require(raw, "s", "size"), "size"),
         conditions=conditions,
-        provider_trade_id=(
-            str(v) if (v := _get(raw, "i", "id", "trade_id")) is not None else None
-        ),
+        provider_trade_id=(str(v) if (v := _get(raw, "i", "id", "trade_id")) is not None else None),
         provider_info=ProviderInfo(provider=provider),
         received_at=received_at,
     )
@@ -171,11 +159,7 @@ def normalize_trade(raw: dict[str, Any], provider: str, received_at: datetime) -
 
 def normalize_news(raw: dict[str, Any], provider: str, received_at: datetime) -> NewsArticle:
     symbols_raw = _get(raw, "symbols", "ticker_symbols")
-    symbols = (
-        [str(s).upper() for s in symbols_raw]
-        if isinstance(symbols_raw, list)
-        else []
-    )
+    symbols = [str(s).upper() for s in symbols_raw] if isinstance(symbols_raw, list) else []
     return NewsArticle(
         provider_article_id=str(_require(raw, "id", "article_id")),
         headline=str(_require(raw, "headline", "title")),
@@ -183,9 +167,7 @@ def normalize_news(raw: dict[str, Any], provider: str, received_at: datetime) ->
         source=(str(v) if (v := _get(raw, "source")) is not None else None),
         url=(str(v) if (v := _get(raw, "url", "article_url")) is not None else None),
         symbols=symbols,
-        published_at=parse_timestamp(
-            _require(raw, "created_at", "published_at", "published_utc")
-        ),
+        published_at=parse_timestamp(_require(raw, "created_at", "published_at", "published_utc")),
         provider_info=ProviderInfo(provider=provider),
         received_at=received_at,
     )

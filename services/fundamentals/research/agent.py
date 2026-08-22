@@ -120,11 +120,31 @@ class FundamentalResearchAgent(ResearchAgent):
             )
             raise
 
-        raw = response.get("content") if isinstance(response, dict) else getattr(response, "content", None)
-        provider = response.get("provider") if isinstance(response, dict) else getattr(response, "provider", "unknown")
-        model = response.get("model") if isinstance(response, dict) else getattr(response, "model", "unknown")
-        latency = response.get("latency_ms") if isinstance(response, dict) else getattr(response, "latency_ms", 0)
-        structured = response.get("structured") if isinstance(response, dict) else getattr(response, "structured", None)
+        raw = (
+            response.get("content")
+            if isinstance(response, dict)
+            else getattr(response, "content", None)
+        )
+        provider = (
+            response.get("provider")
+            if isinstance(response, dict)
+            else getattr(response, "provider", "unknown")
+        )
+        model = (
+            response.get("model")
+            if isinstance(response, dict)
+            else getattr(response, "model", "unknown")
+        )
+        latency = (
+            response.get("latency_ms")
+            if isinstance(response, dict)
+            else getattr(response, "latency_ms", 0)
+        )
+        structured = (
+            response.get("structured")
+            if isinstance(response, dict)
+            else getattr(response, "structured", None)
+        )
         payload = structured if isinstance(structured, dict) else _parse_json(raw)
 
         if payload is None:

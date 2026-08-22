@@ -45,9 +45,7 @@ def configure_logging(level: str = "INFO", json_output: bool = True) -> None:
     ]
 
     renderer: structlog.typing.Processor = (
-        structlog.processors.JSONRenderer()
-        if json_output
-        else structlog.dev.ConsoleRenderer()
+        structlog.processors.JSONRenderer() if json_output else structlog.dev.ConsoleRenderer()
     )
 
     structlog.configure(
@@ -68,4 +66,4 @@ def configure_logging(level: str = "INFO", json_output: bool = True) -> None:
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """Return a bound structured logger."""
-    return structlog.get_logger(name)  # type: ignore[no-any-return]
+    return structlog.get_logger(name)

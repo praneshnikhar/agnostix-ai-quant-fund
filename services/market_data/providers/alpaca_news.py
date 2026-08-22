@@ -51,11 +51,7 @@ class AlpacaNewsProvider(NewsProvider):
             raw = (
                 dict(row)
                 if isinstance(row, dict)
-                else {
-                    k: v
-                    for k, v in vars(row).items()
-                    if not k.startswith("_") and v is not None
-                }
+                else {k: v for k, v in vars(row).items() if not k.startswith("_") and v is not None}
             )
             # alpaca-py uses ticker_symbols + published_at naming.
             if "symbols" not in raw and "ticker_symbols" in raw:
@@ -63,9 +59,7 @@ class AlpacaNewsProvider(NewsProvider):
             if "published_at" in raw and "created_at" not in raw:
                 raw["created_at"] = raw["published_at"]
             try:
-                articles.append(
-                    normalize_news(raw, provider=PROVIDER, received_at=received)
-                )
+                articles.append(normalize_news(raw, provider=PROVIDER, received_at=received))
             except NormalizationError:
                 continue
         return articles

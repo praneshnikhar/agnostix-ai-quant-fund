@@ -17,8 +17,12 @@ THESIS = {
     "confidence": 0.7,
     "investment_thesis": "Strong growth.",
     "evidence": [
-        {"evidence_id": "ev1", "source": "acme-fy2025-10k", "source_type": "document",
-         "claim_supported": "growth"}
+        {
+            "evidence_id": "ev1",
+            "source": "acme-fy2025-10k",
+            "source_type": "document",
+            "claim_supported": "growth",
+        }
     ],
 }
 
@@ -35,12 +39,21 @@ class FakeSession:
 
 def _run(**over):
     base = dict(
-        id=RUN_ID, symbol="ACME", status="completed", created_at=T0,
-        completed_at=T0, critic_verdict="PASS", agent_id="fundamental_research_agent_v1",
-        agent_version="v1", prompt_version="m2-fundamental-v1",
-        model_provider="mock", model_name="mock-model-1",
+        id=RUN_ID,
+        symbol="ACME",
+        status="completed",
+        created_at=T0,
+        completed_at=T0,
+        critic_verdict="PASS",
+        agent_id="fundamental_research_agent_v1",
+        agent_version="v1",
+        prompt_version="m2-fundamental-v1",
+        model_provider="mock",
+        model_name="mock-model-1",
         context_payload={"context_version": "m2-v1"},
-        research_output=THESIS, critic_output={"verdict": "PASS"}, error=None,
+        research_output=THESIS,
+        critic_output={"verdict": "PASS"},
+        error=None,
     )
     base.update(over)
     return _Rec(**base)
@@ -52,13 +65,24 @@ def seeded(monkeypatch):
 
     run = _run()
     metric = _Rec(
-        metric="revenue", value=115200.0, period_type="annual",
-        period_end=T0.date(), fiscal_year=2025, fiscal_quarter=None,
-        currency="USD", quality="ok", provider="fixture",
+        metric="revenue",
+        value=115200.0,
+        period_type="annual",
+        period_end=T0.date(),
+        fiscal_year=2025,
+        fiscal_quarter=None,
+        currency="USD",
+        quality="ok",
+        provider="fixture",
     )
     doc = _Rec(
-        document_id="acme-fy2025-10k", title="FY2025 10-K", document_type="filing",
-        source="sec", url=None, published_at=T0, retrieved_at=T0,
+        document_id="acme-fy2025-10k",
+        title="FY2025 10-K",
+        document_type="filing",
+        source="sec",
+        url=None,
+        published_at=T0,
+        retrieved_at=T0,
     )
 
     class Runs:

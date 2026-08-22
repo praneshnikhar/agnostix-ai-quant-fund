@@ -44,9 +44,7 @@ class OllamaAdapter(ProviderAdapter):
 
         payload: dict[str, object] = {
             "model": self._model_for(request.model_class),
-            "messages": [
-                {"role": m.role, "content": m.content} for m in request.messages
-            ],
+            "messages": [{"role": m.role, "content": m.content} for m in request.messages],
             "stream": False,
         }
         if request.temperature is not None:
@@ -69,9 +67,7 @@ class OllamaAdapter(ProviderAdapter):
             usage=Usage(
                 prompt_tokens=data.get("prompt_eval_count"),
                 completion_tokens=data.get("eval_count"),
-                total_tokens=(
-                    (data.get("prompt_eval_count") or 0) + (data.get("eval_count") or 0)
-                )
+                total_tokens=((data.get("prompt_eval_count") or 0) + (data.get("eval_count") or 0))
                 or None,
             ),
             latency_ms=latency_ms,

@@ -13,9 +13,7 @@ def get_redis() -> aioredis.Redis:
     """Lazily create the process-wide async Redis client."""
     global _redis
     if _redis is None:
-        _redis = aioredis.from_url(
-            get_settings().redis_url, decode_responses=True
-        )
+        _redis = aioredis.from_url(get_settings().redis_url, decode_responses=True)
     return _redis
 
 

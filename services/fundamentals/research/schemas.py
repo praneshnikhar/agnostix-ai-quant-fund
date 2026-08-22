@@ -34,11 +34,11 @@ class EvidenceRef(BaseModel):
     """Reference to supporting evidence (§16)."""
 
     evidence_id: str
-    source: str                       # provider/document id — never invented
-    source_type: str                  # metric | document | earnings | valuation | news
+    source: str  # provider/document id — never invented
+    source_type: str  # metric | document | earnings | valuation | news
     relevant_period: str | None = None
     claim_supported: str
-    url: str | None = None            # only URLs present in context
+    url: str | None = None  # only URLs present in context
     data_reference: dict[str, Any] | None = None
 
 
@@ -53,7 +53,7 @@ class ResearchStatement(BaseModel):
 class Assessment(BaseModel):
     """One assessment dimension of the thesis."""
 
-    area: str                         # growth | profitability | cash_flow | balance_sheet | valuation
+    area: str  # growth | profitability | cash_flow | balance_sheet | valuation
     summary: str
     statements: list[ResearchStatement] = Field(default_factory=list)
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)
@@ -67,7 +67,7 @@ class Catalyst(BaseModel):
 
 class RiskItem(BaseModel):
     description: str
-    severity: str = "medium"          # low | medium | high
+    severity: str = "medium"  # low | medium | high
     evidence_ids: list[str] = Field(default_factory=list)
 
 
@@ -78,7 +78,7 @@ class InvalidationCondition(BaseModel):
 
 class DataQualityNote(BaseModel):
     area: str
-    quality: str                      # ok | conflicting | incomplete | invalid | unavailable
+    quality: str  # ok | conflicting | incomplete | invalid | unavailable
     detail: str | None = None
 
 
@@ -140,9 +140,9 @@ class ClaimCheck(BaseModel):
 
 
 class CriticFinding(BaseModel):
-    category: str   # factual_grounding | numerical_consistency | unsupported_claim |
-                    # missing_risk | logical_consistency | confidence_calibration | ...
-    severity: str = "warning"         # info | warning | critical
+    category: str  # factual_grounding | numerical_consistency | unsupported_claim |
+    # missing_risk | logical_consistency | confidence_calibration | ...
+    severity: str = "warning"  # info | warning | critical
     detail: str
 
 

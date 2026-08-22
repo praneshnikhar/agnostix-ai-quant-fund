@@ -164,9 +164,7 @@ class AlpacaMarketDataProvider(MarketDataProvider):
     # -- helpers -------------------------------------------------------------
 
     @staticmethod
-    def _request(
-        symbol: str, timeframe: str, start: datetime, end: datetime, limit: int
-    ) -> dict:
+    def _request(symbol: str, timeframe: str, start: datetime, end: datetime, limit: int) -> dict:
         tf_map = {"1Min": "1Min", "1Hour": "1Hour", "1Day": "1Day"}
         try:
             from typing import Any, cast
@@ -203,7 +201,7 @@ class AlpacaMarketDataProvider(MarketDataProvider):
     @staticmethod
     def _extract(resp: object, symbol: str) -> list[dict]:
         """Normalize alpaca-py response shapes ({sym: [...]}, BarSet, dicts)."""
-        from typing import Any, cast
+        from typing import Any
 
         if isinstance(resp, dict):
             data: Any = resp.get(symbol.upper(), resp)
@@ -220,9 +218,7 @@ class AlpacaMarketDataProvider(MarketDataProvider):
             if isinstance(row, dict):
                 out.append(row)
             else:  # alpaca-py model objects -> attribute dump
-                out.append({
-                    k: v
-                    for k, v in vars(row).items()
-                    if not k.startswith("_") and v is not None
-                })
+                out.append(
+                    {k: v for k, v in vars(row).items() if not k.startswith("_") and v is not None}
+                )
         return out

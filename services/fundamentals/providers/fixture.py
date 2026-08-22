@@ -51,7 +51,9 @@ def _annual(symbol: str, metric: str, fy: int, value: float) -> FinancialMetric:
     )
 
 
-def _quarterly(symbol: str, metric: str, year: int, q: int, end: date, value: float) -> FinancialMetric:
+def _quarterly(
+    symbol: str, metric: str, year: int, q: int, end: date, value: float
+) -> FinancialMetric:
     return FinancialMetric(
         symbol=symbol,
         metric=metric,
@@ -204,17 +206,56 @@ class FixtureEarningsProvider(EarningsProvider):
             return []
         rows = [
             # (event_time, fy, fq, period_end, eps_a, eps_e, rev_a, rev_e)
-            (datetime(2025, 1, 28, tzinfo=UTC), 2025, 1, _Q_ENDS[1], 0.51, 0.48, 25_600.0, 24_800.0),
-            (datetime(2025, 4, 29, tzinfo=UTC), 2025, 2, _Q_ENDS[2], 0.55, 0.54, 27_648.0, 27_100.0),
-            (datetime(2025, 7, 29, tzinfo=UTC), 2025, 3, _Q_ENDS[3], 0.59, 0.60, 29_900.0, 30_200.0),
-            (datetime(2025, 10, 28, tzinfo=UTC), 2025, 4, _Q_ENDS[4], 0.63, 0.61, 32_052.0, 31_500.0),
+            (
+                datetime(2025, 1, 28, tzinfo=UTC),
+                2025,
+                1,
+                _Q_ENDS[1],
+                0.51,
+                0.48,
+                25_600.0,
+                24_800.0,
+            ),
+            (
+                datetime(2025, 4, 29, tzinfo=UTC),
+                2025,
+                2,
+                _Q_ENDS[2],
+                0.55,
+                0.54,
+                27_648.0,
+                27_100.0,
+            ),
+            (
+                datetime(2025, 7, 29, tzinfo=UTC),
+                2025,
+                3,
+                _Q_ENDS[3],
+                0.59,
+                0.60,
+                29_900.0,
+                30_200.0,
+            ),
+            (
+                datetime(2025, 10, 28, tzinfo=UTC),
+                2025,
+                4,
+                _Q_ENDS[4],
+                0.63,
+                0.61,
+                32_052.0,
+                31_500.0,
+            ),
         ]
         return [
             EarningsEvent(
                 symbol="ACME",
                 event_time=t,
                 reporting_period=FinancialPeriod(
-                    period_type=PeriodType.QUARTERLY, period_end=pe, fiscal_year=fy, fiscal_quarter=fq
+                    period_type=PeriodType.QUARTERLY,
+                    period_end=pe,
+                    fiscal_year=fy,
+                    fiscal_quarter=fq,
                 ),
                 eps_actual=a,
                 eps_estimate=e,

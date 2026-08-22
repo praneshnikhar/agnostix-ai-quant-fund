@@ -62,9 +62,7 @@ class CompanyProfileRepository:
 
     async def get_by_symbol(self, symbol: str) -> CompanyProfileRecord | None:
         result = await self._session.execute(
-            select(CompanyProfileRecord).where(
-                CompanyProfileRecord.symbol == symbol.upper()
-            )
+            select(CompanyProfileRecord).where(CompanyProfileRecord.symbol == symbol.upper())
         )
         return result.scalar_one_or_none()
 
@@ -92,7 +90,9 @@ class FinancialMetricRepository:
         result = await self._session.execute(stmt)
         return int(getattr(result, "rowcount", 0) or 0)
 
-    async def get_metrics(self, symbol: str, period_type: str | None = None) -> list[FinancialMetricRecord]:
+    async def get_metrics(
+        self, symbol: str, period_type: str | None = None
+    ) -> list[FinancialMetricRecord]:
         q = (
             select(FinancialMetricRecord)
             .where(FinancialMetricRecord.symbol == symbol.upper())
@@ -268,9 +268,7 @@ class ResearchRunRepository:
         run.error = error[:2000]
 
     async def get_run(self, run_id: uuid.UUID) -> ResearchRun | None:
-        result = await self._session.execute(
-            select(ResearchRun).where(ResearchRun.id == run_id)
-        )
+        result = await self._session.execute(select(ResearchRun).where(ResearchRun.id == run_id))
         return result.scalar_one_or_none()
 
     async def get_latest_completed(self, symbol: str) -> ResearchRun | None:

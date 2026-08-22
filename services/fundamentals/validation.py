@@ -41,8 +41,8 @@ _SIGNED_METRICS = frozenset({"net_income", "operating_cash_flow", "free_cash_flo
 class IntegrityIssue(BaseModel):
     """One detected integrity problem — descriptive, never auto-corrected."""
 
-    subject: str          # e.g. "metric:revenue:2025-12-31"
-    issue: str            # machine-readable code
+    subject: str  # e.g. "metric:revenue:2025-12-31"
+    issue: str  # machine-readable code
     detail: str
 
 
@@ -72,7 +72,9 @@ def validate_metric(metric: FinancialMetric) -> list[IntegrityIssue]:
 
     # Timestamp validity handled by schema (tz-aware); period sanity here.
     p = metric.period
-    if p.period_type == PeriodType.TTM and (p.fiscal_year is not None or p.fiscal_quarter is not None):
+    if p.period_type == PeriodType.TTM and (
+        p.fiscal_year is not None or p.fiscal_quarter is not None
+    ):
         issues.append(
             IntegrityIssue(
                 subject=key,
@@ -131,9 +133,12 @@ def flag_quality(metrics: list[FinancialMetric]) -> list[FinancialMetric]:
     for m in metrics:
         key = f"metric:{m.metric}:{m.period.period_end.isoformat()}"
         conflict_keys = [
-            k for k in by_subject
-            if k.startswith("conflict:") and f":{m.symbol}:" in k
-            and f":{m.metric}:" in k and m.period.period_end.isoformat() in k
+            k
+            for k in by_subject
+            if k.startswith("conflict:")
+            and f":{m.symbol}:" in k
+            and f":{m.metric}:" in k
+            and m.period.period_end.isoformat() in k
         ]
         if any(k in by_subject for k in [key, *conflict_keys]):
             new_q = (
@@ -173,7 +178,9 @@ def validate_earnings(events: list[EarningsEvent]) -> list[IntegrityIssue]:
 def validate_valuation(v: ValuationSnapshot) -> list[IntegrityIssue]:
     issues: list[IntegrityIssue] = []
     if v.price is not None and v.price <= 0:
-        issues.append(IntegrityIssue(subject=f"valuation:{v.symbol}", issue="bad_price", detail="price<=0"))
+        issues.append(
+            IntegrityIssue(subject=f"valuation:{v.symbol}", issue="bad_price", detail="price<=0")
+        )
     if v.market_cap is not None and v.shares_outstanding is not None and v.price is not None:
         implied = v.price * v.shares_outstanding
         if abs(implied - v.market_cap) / max(implied, 1e-9) > 0.05:

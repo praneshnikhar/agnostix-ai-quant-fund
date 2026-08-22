@@ -24,26 +24,26 @@ def _status(
 ) -> MarketDataStatus:
     thresholds = load_thresholds_from_settings(None)
     threshold = thresholds.for_datatype(datatype)
-    state, status = evaluate_freshness(
-        event_time, now, threshold, symbol=symbol, datatype=datatype
-    )
+    state, status = evaluate_freshness(event_time, now, threshold, symbol=symbol, datatype=datatype)
     if state is FreshnessState.MISSING:
         status.detail = "no data ingested"
     return status
 
 
 def _news_schema(n) -> NewsArticle:
-    return NewsArticle.model_validate({
-        "provider_article_id": n.provider_article_id,
-        "headline": n.headline,
-        "summary": n.summary,
-        "source": n.source,
-        "url": n.url,
-        "symbols": n.symbols,
-        "published_at": n.published_at,
-        "received_at": n.received_at,
-        "provider_info": {"provider": n.provider},
-    })
+    return NewsArticle.model_validate(
+        {
+            "provider_article_id": n.provider_article_id,
+            "headline": n.headline,
+            "summary": n.summary,
+            "source": n.source,
+            "url": n.url,
+            "symbols": n.symbols,
+            "published_at": n.published_at,
+            "received_at": n.received_at,
+            "provider_info": {"provider": n.provider},
+        }
+    )
 
 
 async def build_snapshot(session, symbol: str) -> MarketSnapshot:

@@ -21,12 +21,12 @@ from langgraph.graph import END, StateGraph
 class PipelineState(TypedDict, total=False):
     """Shared state flowing through the proposal pipeline."""
 
-    proposal: dict[str, Any]          # TradeProposal (serialized)
+    proposal: dict[str, Any]  # TradeProposal (serialized)
     critic_verdict: dict[str, Any] | None
     risk_assessment: dict[str, Any] | None
-    human_decision: dict[str, Any] | None   # present ONLY after approval gate
+    human_decision: dict[str, Any] | None  # present ONLY after approval gate
     execution_result: dict[str, Any] | None
-    halted: bool                       # kill switch / rejection short-circuit
+    halted: bool  # kill switch / rejection short-circuit
 
 
 def signal_node(state: PipelineState) -> PipelineState:

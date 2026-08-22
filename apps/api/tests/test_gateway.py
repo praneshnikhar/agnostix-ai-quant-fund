@@ -51,22 +51,16 @@ async def test_routes_to_first_configured_provider() -> None:
             FakeAdapter("openai", configured=True),
         ]
     )
-    resp = await gateway.run(
-        task="test", model_class=ModelClass.STANDARD, messages=_msg()
-    )
+    resp = await gateway.run(task="test", model_class=ModelClass.STANDARD, messages=_msg())
     assert resp.success is True
     assert resp.model == "openai-model"
     assert len(gateway.telemetry.snapshot()) == 1
 
 
 async def test_no_provider_configured_raises() -> None:
-    gateway = ModelGateway(
-        adapters=[FakeAdapter("anthropic", configured=False)]
-    )
+    gateway = ModelGateway(adapters=[FakeAdapter("anthropic", configured=False)])
     with pytest.raises(NoProviderConfiguredError):
-        await gateway.run(
-            task="test", model_class=ModelClass.REASONING, messages=_msg()
-        )
+        await gateway.run(task="test", model_class=ModelClass.REASONING, messages=_msg())
 
 
 async def test_telemetry_records_failure_then_raises() -> None:
@@ -76,9 +70,7 @@ async def test_telemetry_records_failure_then_raises() -> None:
 
     gateway = ModelGateway(adapters=[ExplodingAdapter("openai", True)])
     with pytest.raises(RuntimeError):
-        await gateway.run(
-            task="test", model_class=ModelClass.CHEAP, messages=_msg()
-        )
+        await gateway.run(task="test", model_class=ModelClass.CHEAP, messages=_msg())
     snap = gateway.telemetry.snapshot()
     assert len(snap) == 1
     assert snap[0].success is False
@@ -93,7 +85,5 @@ async def test_embedding_prefers_local_provider() -> None:
         ],
         routing_preference=["anthropic", "ollama"],
     )
-    resp = await gateway.run(
-        task="embed", model_class=ModelClass.EMBEDDING, messages=_msg()
-    )
+    resp = await gateway.run(task="embed", model_class=ModelClass.EMBEDDING, messages=_msg())
     assert resp.model == "ollama-model"

@@ -127,9 +127,7 @@ def _run_out(r) -> ResearchRunOut:
 
 
 @router.get("/{symbol}", response_model=ResearchRunOut)
-async def get_latest_research(
-    symbol: str, session: AsyncSession = Depends(get_session)
-):
+async def get_latest_research(symbol: str, session: AsyncSession = Depends(get_session)):
     run = await ResearchRunRepository(session).get_latest_completed(symbol.upper())
     if run is None:
         raise HTTPException(status_code=404, detail=f"no research for {symbol.upper()}")
@@ -159,9 +157,7 @@ async def get_history(
 
 
 @router.get("/{symbol}/fundamentals", response_model=list[MetricOut])
-async def get_fundamentals(
-    symbol: str, session: AsyncSession = Depends(get_session)
-):
+async def get_fundamentals(symbol: str, session: AsyncSession = Depends(get_session)):
     rows = await FinancialMetricRepository(session).get_metrics(symbol.upper())
     return [
         MetricOut(
@@ -243,7 +239,5 @@ async def post_feedback(
     session: AsyncSession = Depends(get_session),
 ):
     """Human research feedback foundation (§26) — NOT connected to trading."""
-    await ResearchFeedbackRepository(session).add_feedback(
-        run_id, body.decision, body.notes, None
-    )
+    await ResearchFeedbackRepository(session).add_feedback(run_id, body.decision, body.notes, None)
     return {"status": "recorded"}

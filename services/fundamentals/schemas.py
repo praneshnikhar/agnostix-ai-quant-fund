@@ -35,7 +35,7 @@ class ProviderInfo(BaseModel):
 
 class DataQuality(StrEnum):
     OK = "ok"
-    CONFLICTING = "conflicting"   # sources disagree; values preserved as-is
+    CONFLICTING = "conflicting"  # sources disagree; values preserved as-is
     INCOMPLETE = "incomplete"
     INVALID = "invalid"
     UNAVAILABLE = "unavailable"
@@ -112,11 +112,11 @@ class FinancialMetric(BaseModel):
     """
 
     symbol: str
-    metric: str                       # e.g. "revenue", "net_income", "eps_diluted"
+    metric: str  # e.g. "revenue", "net_income", "eps_diluted"
     value: float | None = None
     period: FinancialPeriod
     currency: str = "USD"
-    units: str = "usd"                # usd | usd_thousands | shares | ratio | percent
+    units: str = "usd"  # usd | usd_thousands | shares | ratio | percent
     quality: DataQuality = DataQuality.OK
     provider_info: ProviderInfo
     received_at: datetime
@@ -176,7 +176,7 @@ class EarningsEvent(BaseModel):
     an LLM."""
 
     symbol: str
-    event_time: datetime              # when results were published
+    event_time: datetime  # when results were published
     reporting_period: FinancialPeriod
     eps_actual: float | None = None
     eps_estimate: float | None = None
@@ -202,8 +202,8 @@ class EarningsResult(BaseModel):
     """Earnings event + deterministically derived surprise fields."""
 
     event: EarningsEvent
-    eps_surprise: float | None = None          # actual - estimate
-    eps_surprise_pct: float | None = None      # surprise / |estimate|
+    eps_surprise: float | None = None  # actual - estimate
+    eps_surprise_pct: float | None = None  # surprise / |estimate|
     revenue_surprise: float | None = None
     revenue_surprise_pct: float | None = None
 
@@ -250,7 +250,7 @@ class FundamentalDataStatus(BaseModel):
 class ResearchDocument(BaseModel):
     """Normalized research document (filings, releases, transcripts, news)."""
 
-    document_id: str                  # stable id within provider namespace
+    document_id: str  # stable id within provider namespace
     symbol: str
     title: str = Field(min_length=1)
     document_type: DocumentType
@@ -258,7 +258,7 @@ class ResearchDocument(BaseModel):
     url: str | None = None
     published_at: datetime
     retrieved_at: datetime
-    content: str | None = None        # normalized text; None => metadata only
+    content: str | None = None  # normalized text; None => metadata only
     summary: str | None = None
     provider_info: ProviderInfo
     stored_at: datetime | None = None
@@ -280,8 +280,8 @@ class DerivedMetric(BaseModel):
     symbol: str
     metric: str
     value: float
-    formula: str                      # e.g. "(revenue_t - revenue_{t-4}) / revenue_{t-4}"
-    inputs: list[dict[str, Any]]      # each: {metric, period_end, value, source}
+    formula: str  # e.g. "(revenue_t - revenue_{t-4}) / revenue_{t-4}"
+    inputs: list[dict[str, Any]]  # each: {metric, period_end, value, source}
     calculated_at: datetime
     currency: str = "USD"
 

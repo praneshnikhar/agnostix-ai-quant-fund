@@ -41,14 +41,30 @@ def _context_numbers(ctx: FundamentalResearchContext) -> set[float]:
                 vals.add(abs(float(inp["value"])))
     for e in ctx.earnings:
         ev = e.event
-        for v in (ev.eps_actual, ev.eps_estimate, ev.revenue_actual, ev.revenue_estimate,
-                  e.eps_surprise, e.eps_surprise_pct, e.revenue_surprise, e.revenue_surprise_pct):
+        for v in (
+            ev.eps_actual,
+            ev.eps_estimate,
+            ev.revenue_actual,
+            ev.revenue_estimate,
+            e.eps_surprise,
+            e.eps_surprise_pct,
+            e.revenue_surprise,
+            e.revenue_surprise_pct,
+        ):
             if v is not None:
                 vals.add(abs(v))
-    v = ctx.valuation
-    if v is not None:
-        for x in (v.price, v.market_cap, v.pe_ratio, v.forward_pe, v.ps_ratio,
-                  v.ev_ebitda, v.fcf_yield, v.shares_outstanding):
+    val = ctx.valuation
+    if val is not None:
+        for x in (
+            val.price,
+            val.market_cap,
+            val.pe_ratio,
+            val.forward_pe,
+            val.ps_ratio,
+            val.ev_ebitda,
+            val.fcf_yield,
+            val.shares_outstanding,
+        ):
             if x is not None:
                 vals.add(abs(x))
     if ctx.company_profile and ctx.company_profile.employees:
@@ -120,9 +136,12 @@ def check_numerical_grounding(
 
     statements: list[tuple[str, str]] = []
     for area in (
-        thesis.financial_assessment, thesis.growth_assessment,
-        thesis.profitability_assessment, thesis.cash_flow_assessment,
-        thesis.balance_sheet_assessment, thesis.valuation_assessment,
+        thesis.financial_assessment,
+        thesis.growth_assessment,
+        thesis.profitability_assessment,
+        thesis.cash_flow_assessment,
+        thesis.balance_sheet_assessment,
+        thesis.valuation_assessment,
     ):
         for s in area.statements:
             statements.append((f"{area.area}/{s.kind.value}", s.text))
@@ -170,7 +189,9 @@ def check_numerical_grounding(
                 )
             )
         else:
-            checks.append(ClaimCheck(statement=f"{where}: {text[:200]}", status=ClaimCheckStatus.SUPPORTED))
+            checks.append(
+                ClaimCheck(statement=f"{where}: {text[:200]}", status=ClaimCheckStatus.SUPPORTED)
+            )
     return checks, findings
 
 
@@ -224,12 +245,10 @@ def run_deterministic_checks(
         "findings": [f.model_dump() for f in numeric_findings + calibration_findings],
         "passed": not failed and not critical,
         "unsupported_count": sum(
-            1 for c in evidence_checks + numeric_checks
-            if c.status == ClaimCheckStatus.UNSUPPORTED
+            1 for c in evidence_checks + numeric_checks if c.status == ClaimCheckStatus.UNSUPPORTED
         ),
         "contradicted_count": sum(
-            1 for c in evidence_checks + numeric_checks
-            if c.status == ClaimCheckStatus.CONTRADICTED
+            1 for c in evidence_checks + numeric_checks if c.status == ClaimCheckStatus.CONTRADICTED
         ),
     }
 

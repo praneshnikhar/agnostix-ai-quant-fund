@@ -97,11 +97,17 @@ def run_ingestion_bars(
         {"symbol": symbol, "datatype": "bars", "persisted": persisted, "invalid": invalid},
     )
     if cache is not None and valid:
-        latest = max(b.event_time for b in valid)
+        latest = max(b["event_time"] for b in valid)
         summary = {"latest_event_time": latest.isoformat(), "received_at": received.isoformat()}
         asyncio.run(cache.set_json(_key("bars", symbol, timeframe), summary))
-    return {"symbol": symbol, "datatype": "bars", "fetched": len(fetched),
-            "valid": len(valid), "invalid": invalid, "persisted": persisted}
+    return {
+        "symbol": symbol,
+        "datatype": "bars",
+        "fetched": len(fetched),
+        "valid": len(valid),
+        "invalid": invalid,
+        "persisted": persisted,
+    }
 
 
 def run_ingestion_quotes(symbol: str, provider=None, repo_factory=None, cache=None) -> dict:
@@ -133,9 +139,14 @@ def run_ingestion_quotes(symbol: str, provider=None, repo_factory=None, cache=No
                 return await QuoteRepository(session).insert_quotes([row])
 
         persisted = asyncio.run(_go())
-    return {"symbol": symbol, "datatype": "quotes", "fetched": fetched,
-            "valid": fetched - (1 if quote and validate_quote(quote) else 0),
-            "invalid": 1 if quote and validate_quote(quote) else 0, "persisted": persisted}
+    return {
+        "symbol": symbol,
+        "datatype": "quotes",
+        "fetched": fetched,
+        "valid": fetched - (1 if quote and validate_quote(quote) else 0),
+        "invalid": 1 if quote and validate_quote(quote) else 0,
+        "persisted": persisted,
+    }
 
 
 def run_ingestion_trades(symbol: str, limit: int = 50, provider=None, repo_factory=None) -> dict:
@@ -149,16 +160,18 @@ def run_ingestion_trades(symbol: str, limit: int = 50, provider=None, repo_facto
         if validate_trade(t):
             invalid += 1
             continue
-        rows.append({
-            "symbol": t.symbol,
-            "event_time": t.event_time,
-            "price": t.price,
-            "size": t.size,
-            "conditions": t.conditions,
-            "provider": t.provider_info.provider,
-            "provider_trade_id": t.provider_trade_id,
-            "received_at": t.received_at,
-        })
+        rows.append(
+            {
+                "symbol": t.symbol,
+                "event_time": t.event_time,
+                "price": t.price,
+                "size": t.size,
+                "conditions": t.conditions,
+                "provider": t.provider_info.provider,
+                "provider_trade_id": t.provider_trade_id,
+                "received_at": t.received_at,
+            }
+        )
 
     assert repo_factory is not None, "repo_factory is required"
 
@@ -169,12 +182,19 @@ def run_ingestion_trades(symbol: str, limit: int = 50, provider=None, repo_facto
             return await TradeRepository(session).insert_trades(rows)
 
     persisted = asyncio.run(_go()) if rows else 0
-    return {"symbol": symbol, "datatype": "trades", "fetched": len(trades),
-            "valid": len(rows), "invalid": invalid, "persisted": persisted}
+    return {
+        "symbol": symbol,
+        "datatype": "trades",
+        "fetched": len(trades),
+        "valid": len(rows),
+        "invalid": invalid,
+        "persisted": persisted,
+    }
 
 
-def run_ingestion_news(limit: int = 50, symbols: list[str] | None = None,
-                       provider=None, repo_factory=None) -> dict:
+def run_ingestion_news(
+    limit: int = 50, symbols: list[str] | None = None, provider=None, repo_factory=None
+) -> dict:
     from market_data.validation import validate_news
 
     assert provider is not None, "provider is required"
@@ -185,17 +205,19 @@ def run_ingestion_news(limit: int = 50, symbols: list[str] | None = None,
         if validate_news(n):
             invalid += 1
             continue
-        rows.append({
-            "provider": n.provider_info.provider,
-            "provider_article_id": n.provider_article_id,
-            "headline": n.headline,
-            "summary": n.summary,
-            "source": n.source,
-            "url": n.url,
-            "symbols": n.symbols,
-            "published_at": n.published_at,
-            "received_at": n.received_at,
-        })
+        rows.append(
+            {
+                "provider": n.provider_info.provider,
+                "provider_article_id": n.provider_article_id,
+                "headline": n.headline,
+                "summary": n.summary,
+                "source": n.source,
+                "url": n.url,
+                "symbols": n.symbols,
+                "published_at": n.published_at,
+                "received_at": n.received_at,
+            }
+        )
 
     assert repo_factory is not None, "repo_factory is required"
 
@@ -207,16 +229,28 @@ def run_ingestion_news(limit: int = 50, symbols: list[str] | None = None,
 
     persisted = asyncio.run(_go()) if rows else 0
     _log_event("news_persisted", {"persisted": persisted, "invalid": invalid})
-    return {"symbol": None, "datatype": "news", "fetched": len(articles),
-            "valid": len(rows), "invalid": invalid, "persisted": persisted}
+    return {
+        "symbol": None,
+        "datatype": "news",
+        "fetched": len(articles),
+        "valid": len(rows),
+        "invalid": invalid,
+        "persisted": persisted,
+    }
 
 
 def run_ingestion_security_metadata(symbol: str, provider=None, repo_factory=None) -> dict:
     assert provider is not None, "provider is required"
     security = provider.get_security(symbol)
     if security is None:
-        return {"symbol": symbol, "datatype": "security_metadata",
-                "fetched": 0, "valid": 0, "invalid": 0, "persisted": 0}
+        return {
+            "symbol": symbol,
+            "datatype": "security_metadata",
+            "fetched": 0,
+            "valid": 0,
+            "invalid": 0,
+            "persisted": 0,
+        }
     row = {
         "symbol": security.symbol,
         "name": security.name,
@@ -236,8 +270,14 @@ def run_ingestion_security_metadata(symbol: str, provider=None, repo_factory=Non
             await SecurityRepository(session).upsert_security(row)
 
     asyncio.run(_go())
-    return {"symbol": symbol, "datatype": "security_metadata",
-            "fetched": 1, "valid": 1, "invalid": 0, "persisted": 1}
+    return {
+        "symbol": symbol,
+        "datatype": "security_metadata",
+        "fetched": 1,
+        "valid": 1,
+        "invalid": 0,
+        "persisted": 1,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -278,12 +318,19 @@ def _default_news_provider():
 # ---------------------------------------------------------------------------
 
 
-@shared_task(name="ingest_bars", bind=True, max_retries=3,
-             retry_backoff=True, retry_backoff_max=600, retry_jitter=True)
+@shared_task(
+    name="ingest_bars",
+    bind=True,
+    max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
 def ingest_bars(self, symbol: str, timeframe: str = "1Day") -> dict:
     try:
-        return run_ingestion_bars(symbol, timeframe=timeframe,
-                                  provider=_default_provider(), repo_factory=_repo_factory)
+        return run_ingestion_bars(
+            symbol, timeframe=timeframe, provider=_default_provider(), repo_factory=_repo_factory
+        )
     except Exception as exc:
         if _is_transient(exc):
             raise self.retry(exc=exc) from exc
@@ -291,12 +338,19 @@ def ingest_bars(self, symbol: str, timeframe: str = "1Day") -> dict:
         raise
 
 
-@shared_task(name="ingest_quotes", bind=True, max_retries=3,
-             retry_backoff=True, retry_backoff_max=600, retry_jitter=True)
+@shared_task(
+    name="ingest_quotes",
+    bind=True,
+    max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
 def ingest_quotes(self, symbol: str) -> dict:
     try:
-        return run_ingestion_quotes(symbol, provider=_default_provider(),
-                                    repo_factory=_repo_factory)
+        return run_ingestion_quotes(
+            symbol, provider=_default_provider(), repo_factory=_repo_factory
+        )
     except Exception as exc:
         if _is_transient(exc):
             raise self.retry(exc=exc) from exc
@@ -304,12 +358,19 @@ def ingest_quotes(self, symbol: str) -> dict:
         raise
 
 
-@shared_task(name="ingest_trades", bind=True, max_retries=3,
-             retry_backoff=True, retry_backoff_max=600, retry_jitter=True)
+@shared_task(
+    name="ingest_trades",
+    bind=True,
+    max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
 def ingest_trades(self, symbol: str, limit: int = 50) -> dict:
     try:
-        return run_ingestion_trades(symbol, limit=limit,
-                                    provider=_default_provider(), repo_factory=_repo_factory)
+        return run_ingestion_trades(
+            symbol, limit=limit, provider=_default_provider(), repo_factory=_repo_factory
+        )
     except Exception as exc:
         if _is_transient(exc):
             raise self.retry(exc=exc) from exc
@@ -317,12 +378,22 @@ def ingest_trades(self, symbol: str, limit: int = 50) -> dict:
         raise
 
 
-@shared_task(name="ingest_news", bind=True, max_retries=3,
-             retry_backoff=True, retry_backoff_max=600, retry_jitter=True)
+@shared_task(
+    name="ingest_news",
+    bind=True,
+    max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
 def ingest_news(self, limit: int = 50) -> dict:
     try:
-        return run_ingestion_news(limit=limit, symbols=load_watchlist(),
-                                  provider=_default_news_provider(), repo_factory=_repo_factory)
+        return run_ingestion_news(
+            limit=limit,
+            symbols=load_watchlist(),
+            provider=_default_news_provider(),
+            repo_factory=_repo_factory,
+        )
     except Exception as exc:
         if _is_transient(exc):
             raise self.retry(exc=exc) from exc
@@ -330,13 +401,19 @@ def ingest_news(self, limit: int = 50) -> dict:
         raise
 
 
-@shared_task(name="ingest_security_metadata", bind=True, max_retries=3,
-             retry_backoff=True, retry_backoff_max=600, retry_jitter=True)
+@shared_task(
+    name="ingest_security_metadata",
+    bind=True,
+    max_retries=3,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+)
 def ingest_security_metadata(self, symbol: str) -> dict:
     try:
-        return run_ingestion_security_metadata(symbol,
-                                               provider=_default_provider(),
-                                               repo_factory=_repo_factory)
+        return run_ingestion_security_metadata(
+            symbol, provider=_default_provider(), repo_factory=_repo_factory
+        )
     except Exception as exc:
         if _is_transient(exc):
             raise self.retry(exc=exc) from exc

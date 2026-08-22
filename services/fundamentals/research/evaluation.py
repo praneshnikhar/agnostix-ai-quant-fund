@@ -95,7 +95,9 @@ async def evaluate_model(
         record.schema_valid = True
         record.fundamental_view = run_result.thesis.fundamental_view.value
         record.confidence = run_result.thesis.confidence
-        record.unsupported_claims = _count_unsupported(run_result.thesis.model_dump(mode="json"), ctx)
+        record.unsupported_claims = _count_unsupported(
+            run_result.thesis.model_dump(mode="json"), ctx
+        )
         critic = FundamentalResearchCritic(emitter)
         critic_out = await critic.run(CriticInput(context=ctx, thesis=run_result.thesis))
         record.critic_verdict = critic_out.review.verdict

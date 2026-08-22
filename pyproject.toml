@@ -24,7 +24,12 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]  # asserts allowed in tests
 "services/market_data/tests/**" = ["S101"]
+"services/fundamentals/tests/**" = ["S101"]
 "apps/api/tests/**" = ["S101"]
+# S101: workers use asserts as internal invariants on ingestion pipelines.
+"apps/api/app/workers/**" = ["S101"]
+# S105: StrEnum members like Verdict.PASS = "PASS" are not passwords.
+"services/fundamentals/research/schemas.py" = ["S105"]
 # S105: StrEnum members like Verdict.PASS = "pass" are not passwords,
 # and settings defaults are placeholders, not credentials.
 "apps/api/app/schemas/contracts.py" = ["S105"]
@@ -45,7 +50,12 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["apps/api/tests", "tests/integration", "services/market_data/tests"]
+testpaths = [
+    "apps/api/tests",
+    "tests/integration",
+    "services/market_data/tests",
+    "services/fundamentals/tests",
+]
 markers = [
     "integration: tests requiring live infrastructure (deselect with '-m \"not integration\"')",
 ]

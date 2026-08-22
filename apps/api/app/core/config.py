@@ -30,9 +30,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     # --- Database / cache ---
-    database_url: str = (
-        "postgresql+asyncpg://fund:change-me-local-only@localhost:5432/fund"
-    )
+    database_url: str = "postgresql+asyncpg://fund:change-me-local-only@localhost:5432/fund"
     redis_url: str = "redis://localhost:6379/0"
 
     # --- Model gateway providers (all optional) ---

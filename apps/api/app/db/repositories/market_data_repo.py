@@ -147,9 +147,7 @@ class TradeRepository:
         if not rows:
             return 0
         stmt = pg_insert(TradeRecord).values(rows)
-        stmt = stmt.on_conflict_do_nothing(
-            index_elements=["provider", "provider_trade_id"]
-        )
+        stmt = stmt.on_conflict_do_nothing(index_elements=["provider", "provider_trade_id"])
         result = await self._session.execute(stmt)
         return int(getattr(result, "rowcount", 0) or 0)
 
@@ -172,9 +170,7 @@ class NewsRepository:
         if not rows:
             return 0
         stmt = pg_insert(NewsArticleRecord).values(rows)
-        stmt = stmt.on_conflict_do_nothing(
-            index_elements=["provider", "provider_article_id"]
-        )
+        stmt = stmt.on_conflict_do_nothing(index_elements=["provider", "provider_article_id"])
         result = await self._session.execute(stmt)
         return int(getattr(result, "rowcount", 0) or 0)
 

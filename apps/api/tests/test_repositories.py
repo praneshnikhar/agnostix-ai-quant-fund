@@ -45,9 +45,7 @@ def test_all_m1_tables_registered() -> None:
 
 def test_market_bars_unique_identity() -> None:
     # Declared as a unique Index (equivalent to a unique constraint in PG).
-    idx = next(
-        i for i in MarketBar.__table__.indexes if i.name == "uq_market_bars_identity"
-    )
+    idx = next(i for i in MarketBar.__table__.indexes if i.name == "uq_market_bars_identity")
     assert idx.unique
     cols = {c.name for c in idx.columns}
     assert cols == {"provider", "symbol", "timeframe", "event_time"}
@@ -55,9 +53,7 @@ def test_market_bars_unique_identity() -> None:
 
 def test_news_unique_identity_and_gin_index() -> None:
     table = NewsArticleRecord.__table__
-    names = {i.name for i in table.indexes} | {
-        c.name for c in table.constraints if c.name
-    }
+    names = {i.name for i in table.indexes} | {c.name for c in table.constraints if c.name}
     assert "uq_news_identity" in names
     assert "ix_news_symbols_gin" in names
 

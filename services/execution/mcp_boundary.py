@@ -49,17 +49,11 @@ class AgentRole(StrEnum):
 # Role → allowed MCP tools. Order placement is deliberately absent from
 # every role except execution.
 ROLE_TOOLS: dict[AgentRole, frozenset[McpTool]] = {
-    AgentRole.SIGNAL: frozenset(
-        {McpTool.GET_BARS, McpTool.GET_NEWS}
-    ),
-    AgentRole.CRITIC: frozenset(
-        {McpTool.GET_BARS, McpTool.GET_NEWS}
-    ),
+    AgentRole.SIGNAL: frozenset({McpTool.GET_BARS, McpTool.GET_NEWS}),
+    AgentRole.CRITIC: frozenset({McpTool.GET_BARS, McpTool.GET_NEWS}),
     # Execution is granted at runtime only with authorization provenance;
     # see ToolGateway.call() enforcement below.
-    AgentRole.EXECUTION: frozenset(
-        {McpTool.GET_ACCOUNT, McpTool.GET_POSITIONS}
-    ),
+    AgentRole.EXECUTION: frozenset({McpTool.GET_ACCOUNT, McpTool.GET_POSITIONS}),
 }
 
 
@@ -90,9 +84,7 @@ class ToolGateway:
         """Invoke an MCP tool after enforcing the permission model."""
         allowed = ROLE_TOOLS.get(role, frozenset())
         if tool not in allowed:
-            raise PermissionError(
-                f"role={role.value} is not permitted to use tool={tool.value}"
-            )
+            raise PermissionError(f"role={role.value} is not permitted to use tool={tool.value}")
 
         if tool == McpTool.SUBMIT_ORDER:
             if not authorization_event_id or not authorized_by_user_id:
@@ -103,8 +95,7 @@ class ToolGateway:
 
         if not self.available:
             raise McpUnavailableError(
-                "ALPACA_MCP_URL is not configured; fall back to the "
-                "SDK/API broker adapter."
+                "ALPACA_MCP_URL is not configured; fall back to the SDK/API broker adapter."
             )
 
         payload = {
@@ -120,4 +111,4 @@ class ToolGateway:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(self._mcp_url, json=payload)
             resp.raise_for_status()
-            return resp.json()  # type: ignore[no-any-return]
+            return resp.json()

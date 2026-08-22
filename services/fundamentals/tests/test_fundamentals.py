@@ -8,7 +8,6 @@ import pytest
 from pydantic import ValidationError
 
 from fundamentals.context import (
-    FundamentalResearchContext,
     build_fundamental_context,
     render_context_for_model,
 )
@@ -129,15 +128,28 @@ def test_revenue_growth_yoy_deterministic():
 
 
 def test_margin_missing_inputs_returns_none():
-    assert margin([_metric("gross_profit", 10.0, date(2025, 9, 30))], "gross_profit", date(2025, 9, 30)) is None
+    assert (
+        margin(
+            [_metric("gross_profit", 10.0, date(2025, 9, 30))], "gross_profit", date(2025, 9, 30)
+        )
+        is None
+    )
 
 
 def test_net_debt_and_surprise():
     metrics = [
         _metric("total_debt", 12_000.0, date(2025, 9, 30), pt=PeriodType.QUARTERLY, fy=2025, fq=4),
-        _metric("cash_and_equivalents", 28_000.0, date(2025, 9, 30), pt=PeriodType.QUARTERLY, fy=2025, fq=4),
+        _metric(
+            "cash_and_equivalents",
+            28_000.0,
+            date(2025, 9, 30),
+            pt=PeriodType.QUARTERLY,
+            fy=2025,
+            fq=4,
+        ),
     ]
-    assert net_debt(metrics, date(2025, 9, 30), PeriodType.QUARTERLY).value == -16_000.0
+    nd = net_debt(metrics, date(2025, 9, 30), PeriodType.QUARTERLY)
+    assert nd is not None and nd.value == -16_000.0
     assert earnings_surprise(0.63, 0.61) == (pytest.approx(0.02), pytest.approx(0.032787, rel=1e-4))
     assert earnings_surprise(None, 0.61) == (None, None)
 
@@ -151,9 +163,11 @@ def test_fixture_providers_deterministic():
     m2 = p.get_financial_metrics("ACME")
     assert [x.model_dump() for x in m1] == [x.model_dump() for x in m2]
     assert p.get_company_profile("NOPE") is None
-    assert p.get_company_profile("acme").symbol == "ACME"
+    prof = p.get_company_profile("acme")
+    assert prof is not None and prof.symbol == "ACME"
     assert FixtureEarningsProvider().get_earnings_events("ACME")
-    assert FixtureValuationProvider().get_valuation_snapshot("ACME").price == 91.20
+    val = FixtureValuationProvider().get_valuation_snapshot("ACME")
+    assert val is not None and val.price == 91.20
     assert len(FixtureDocumentsProvider().get_documents("ACME")) == 3
 
 
@@ -221,15 +235,20 @@ def _thesis(view=FundamentalView.BULLISH, confidence=0.7, fact="Revenue was 115,
         growth_assessment=Assessment(
             area="growth",
             summary="growing",
-            statements=[
-                ResearchStatement(kind=ClaimKind.FACT, text=fact, evidence_ids=["ev1"])
-            ],
+            statements=[ResearchStatement(kind=ClaimKind.FACT, text=fact, evidence_ids=["ev1"])],
         ),
         profitability_assessment=Assessment(area="profitability", summary="ok"),
         cash_flow_assessment=Assessment(area="cash_flow", summary="ok"),
         balance_sheet_assessment=Assessment(area="balance_sheet", summary="ok"),
         valuation_assessment=Assessment(area="valuation", summary="ok"),
-        evidence=[EvidenceRef(evidence_id="ev1", source="acme-fy2025-10k", source_type="document", claim_supported="growth")],
+        evidence=[
+            EvidenceRef(
+                evidence_id="ev1",
+                source="acme-fy2025-10k",
+                source_type="document",
+                claim_supported="growth",
+            )
+        ],
     )
 
 
@@ -244,9 +263,7 @@ def test_grounded_fact_passes():
 
 def test_hallucinated_number_contradicted():
     ctx = _full_context()
-    det = run_deterministic_checks(
-        _thesis(fact="Revenue was 999,999.0 in FY2025."), ctx
-    )
+    det = run_deterministic_checks(_thesis(fact="Revenue was 999,999.0 in FY2025."), ctx)
     assert not det["passed"]
     assert det["contradicted_count"] >= 1
 
@@ -257,9 +274,7 @@ def test_invented_evidence_source_unsupported():
     thesis.evidence[0].source = "not-a-real-doc"
     det = run_deterministic_checks(thesis, ctx)
     assert not det["passed"]
-    assert any(
-        c["status"] == ClaimCheckStatus.UNSUPPORTED.value for c in det["claim_checks"]
-    )
+    assert any(c["status"] == ClaimCheckStatus.UNSUPPORTED.value for c in det["claim_checks"])
 
 
 # ----------------------------------------------------------------- critic
@@ -278,7 +293,9 @@ async def test_critic_passes_grounded_thesis():
 async def test_critic_rejects_hallucinated_numbers():
     ctx = _full_context()
     critic = FundamentalResearchCritic(_emitter())
-    result = await critic.run(CriticInput(context=ctx, thesis=_thesis(fact="Revenue was 42.0 in FY2025.")))
+    result = await critic.run(
+        CriticInput(context=ctx, thesis=_thesis(fact="Revenue was 42.0 in FY2025."))
+    )
     assert result.review.verdict in {Verdict.REVISE, Verdict.REJECT}
 
 
@@ -336,7 +353,7 @@ async def test_agent_produces_valid_thesis_via_mock_gateway():
 async def test_agent_rejects_non_context_input():
     agent = FundamentalResearchAgent(_MockGateway({}), _emitter())
     with pytest.raises(TypeError):
-        await agent.run("not a context")
+        await agent.run("not a context")  # type: ignore[arg-type]
 
 
 @pytest.mark.anyio
@@ -344,7 +361,7 @@ async def test_agent_fails_on_unparseable_output():
     ctx = _full_context()
     gw = _MockGateway({"structured": {"garbage": True}})
     agent = FundamentalResearchAgent(gw, _emitter())
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         await agent.run(ctx)
 
 
@@ -354,12 +371,14 @@ async def test_evaluation_harness_records_and_summarizes():
 
     ctx = _full_context()
     rec = await evaluate_model(
-        _MockGateway(_mock_thesis_payload()), _emitter(), ctx,
-        provider_label="mock", model_label="mock-model-1",
+        _MockGateway(_mock_thesis_payload()),
+        _emitter(),
+        ctx,
+        provider_label="mock",
+        model_label="mock-model-1",
     )
     assert rec.success and rec.schema_valid
     assert rec.critic_verdict == Verdict.PASS
-    report = type("R", (), {"records": [rec]})()
     from fundamentals.research.evaluation import EvaluationReport
 
     summary = EvaluationReport(records=[rec]).summary()

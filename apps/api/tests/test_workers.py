@@ -26,38 +26,81 @@ class FakeProvider:
 
     def get_bars(self, symbol, timeframe="1Day", start=None, end=None, limit=500):
         self.calls.append("bars")
-        good = Bar(symbol=symbol, event_time=T0, open=100, high=110, low=99,
-                   close=105, volume=1000, provider_info=PROV, received_at=T0)
-        bad = Bar.model_construct(symbol=symbol, event_time=T0, open=100, high=90,
-                                  low=99, close=105, volume=1000,
-                                  provider_info=PROV, received_at=T0)
+        good = Bar(
+            symbol=symbol,
+            event_time=T0,
+            open=100,
+            high=110,
+            low=99,
+            close=105,
+            volume=1000,
+            provider_info=PROV,
+            received_at=T0,
+        )
+        bad = Bar.model_construct(
+            symbol=symbol,
+            event_time=T0,
+            open=100,
+            high=90,
+            low=99,
+            close=105,
+            volume=1000,
+            provider_info=PROV,
+            received_at=T0,
+        )
         return [good, bad]
 
     def get_latest_quote(self, symbol):
         self.calls.append("quote")
-        return Quote(symbol=symbol, event_time=T0, bid_price=99.9, ask_price=100.1,
-                     provider_info=PROV, received_at=T0)
+        return Quote(
+            symbol=symbol,
+            event_time=T0,
+            bid_price=99.9,
+            ask_price=100.1,
+            provider_info=PROV,
+            received_at=T0,
+        )
 
     def get_recent_trades(self, symbol, limit=50):
         self.calls.append("trades")
-        return [Trade(symbol=symbol, event_time=T0, price=105, size=10,
-                      provider_info=PROV, received_at=T0)]
+        return [
+            Trade(
+                symbol=symbol, event_time=T0, price=105, size=10, provider_info=PROV, received_at=T0
+            )
+        ]
 
     def get_security(self, symbol):
         self.calls.append("security")
-        return Security(symbol=symbol, name="Test Co", exchange="NASDAQ",
-                        provider_info=PROV, received_at=T0)
+        return Security(
+            symbol=symbol, name="Test Co", exchange="NASDAQ", provider_info=PROV, received_at=T0
+        )
 
 
 class FakeNewsProvider:
     def __init__(self, articles=None) -> None:
-        self.articles = articles if articles is not None else [
-            NewsArticle(provider_article_id="1", headline="h", url="https://x",
-                        symbols=["AAPL"], published_at=T0,
-                        provider_info=PROV, received_at=T0),
-            NewsArticle(provider_article_id="2", headline="bad", url="ftp://x",
-                        published_at=T0, provider_info=PROV, received_at=T0),
-        ]
+        self.articles = (
+            articles
+            if articles is not None
+            else [
+                NewsArticle(
+                    provider_article_id="1",
+                    headline="h",
+                    url="https://x",
+                    symbols=["AAPL"],
+                    published_at=T0,
+                    provider_info=PROV,
+                    received_at=T0,
+                ),
+                NewsArticle(
+                    provider_article_id="2",
+                    headline="bad",
+                    url="ftp://x",
+                    published_at=T0,
+                    provider_info=PROV,
+                    received_at=T0,
+                ),
+            ]
+        )
 
     def get_news(self, symbols=None, limit=50):
         return self.articles

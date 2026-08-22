@@ -18,21 +18,48 @@ class FakeSDK:
     def get_stock_bars(self, request) -> dict:
         return {
             "AAPL": [
-                {"S": "AAPL", "t": "2024-06-03T14:30:00Z", "o": 100.0, "h": 110.0,
-                 "l": 99.0, "c": 105.0, "v": 1000, "n": 10, "vw": 104.0},
+                {
+                    "S": "AAPL",
+                    "t": "2024-06-03T14:30:00Z",
+                    "o": 100.0,
+                    "h": 110.0,
+                    "l": 99.0,
+                    "c": 105.0,
+                    "v": 1000,
+                    "n": 10,
+                    "vw": 104.0,
+                },
                 # un-normalizable timestamp -> dropped by provider
-                {"S": "AAPL", "t": "not-a-time", "o": 100.0, "h": 110.0,
-                 "l": 99.0, "c": 105.0, "v": 1000},
+                {
+                    "S": "AAPL",
+                    "t": "not-a-time",
+                    "o": 100.0,
+                    "h": 110.0,
+                    "l": 99.0,
+                    "c": 105.0,
+                    "v": 1000,
+                },
             ]
         }
 
     def get_stock_latest_quote(self, params) -> dict:
-        return {"AAPL": [{"S": "AAPL", "t": "2024-06-03T14:30:00Z",
-                          "ap": 120.1, "as": 300, "bp": 119.9, "bs": 200}]}
+        return {
+            "AAPL": [
+                {
+                    "S": "AAPL",
+                    "t": "2024-06-03T14:30:00Z",
+                    "ap": 120.1,
+                    "as": 300,
+                    "bp": 119.9,
+                    "bs": 200,
+                }
+            ]
+        }
 
     def get_stock_trades(self, request) -> dict:
-        return {"AAPL": [{"S": "AAPL", "t": "2024-06-03T14:30:00Z",
-                          "p": 105.0, "s": 10, "i": "T1"}]}
+        return {
+            "AAPL": [{"S": "AAPL", "t": "2024-06-03T14:30:00Z", "p": 105.0, "s": 10, "i": "T1"}]
+        }
 
     def get_asset(self, symbol):
         class A:
@@ -42,6 +69,7 @@ class FakeSDK:
                 self.exchange = "NASDAQ"
                 self.status = "active"
                 self.asset_class = "us_equity"
+
         return A(symbol)
 
     def get_news(self, params):
@@ -54,9 +82,11 @@ class FakeSDK:
                 self.url = "https://example.com/a"
                 self.symbols = ["NVDA"]
                 self.created_at = datetime(2024, 6, 3, 13, 0, tzinfo=UTC)
+
         class Resp:
             def __init__(self) -> None:
                 self.news = [N()]
+
         return Resp()
 
 

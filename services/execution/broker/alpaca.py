@@ -40,9 +40,7 @@ def _load_clients() -> tuple[Any, Any]:
 
     s = get_settings()
     if not s.alpaca_api_key or not s.alpaca_secret_key:
-        raise BrokerNotConfiguredError(
-            "ALPACA_API_KEY / ALPACA_SECRET_KEY are not set"
-        )
+        raise BrokerNotConfiguredError("ALPACA_API_KEY / ALPACA_SECRET_KEY are not set")
     if not s.alpaca_paper:
         # Hard safety refusal — M0/M1+ development is paper-only.
         raise LiveTradingRefusedError(
@@ -98,12 +96,8 @@ class AlpacaBroker(Broker):
                 symbol=p.symbol,
                 qty=float(p.qty),
                 avg_entry_price=float(p.avg_entry_price),
-                current_price=(
-                    float(p.current_price) if p.current_price else None
-                ),
-                unrealized_pl=(
-                    float(p.unrealized_pl) if p.unrealized_pl else None
-                ),
+                current_price=(float(p.current_price) if p.current_price else None),
+                unrealized_pl=(float(p.unrealized_pl) if p.unrealized_pl else None),
             )
             for p in positions
         ]
@@ -124,9 +118,7 @@ class AlpacaBroker(Broker):
         order = MarketOrderRequest(
             symbol=request.symbol,
             qty=request.quantity,
-            side=OrderSide.BUY
-            if request.side.value == "buy"
-            else OrderSide.SELL,
+            side=OrderSide.BUY if request.side.value == "buy" else OrderSide.SELL,
             time_in_force=TimeInForce.DAY,
             client_order_id=request.client_order_id,
         )
@@ -145,9 +137,7 @@ class AlpacaBroker(Broker):
             order_id=str(result.id),
             status=str(result.status),
             filled_qty=float(result.filled_qty or 0),
-            filled_avg_price=(
-                float(result.filled_avg_price) if result.filled_avg_price else None
-            ),
+            filled_avg_price=(float(result.filled_avg_price) if result.filled_avg_price else None),
         )
 
 
@@ -159,9 +149,7 @@ class AlpacaMarketDataProvider(MarketDataProvider):
     def __init__(self) -> None:
         _, self._data = _load_clients()
 
-    async def get_bars(
-        self, symbol: str, timeframe: str = "1Day", limit: int = 100
-    ) -> list[Bar]:
+    async def get_bars(self, symbol: str, timeframe: str = "1Day", limit: int = 100) -> list[Bar]:
         if self._data is None:
             raise BrokerNotConfiguredError("Alpaca data client unavailable")
         import asyncio
@@ -176,11 +164,7 @@ class AlpacaMarketDataProvider(MarketDataProvider):
             "Hour": TimeFrameUnit.Hour,
             "Day": TimeFrameUnit.Day,
         }
-        key = (
-            timeframe.split("Day")[0]
-            if timeframe.endswith("Day")
-            else timeframe
-        )
+        key = timeframe.split("Day")[0] if timeframe.endswith("Day") else timeframe
         tf_unit = unit_map.get(key, TimeFrameUnit.Day)
         tf = TimeFrame(1, tf_unit)
 
@@ -194,7 +178,7 @@ class AlpacaMarketDataProvider(MarketDataProvider):
         )
         bars = await asyncio.to_thread(self._data.get_stock_bars, req)
         out: list[Bar] = []
-        for bar in bars[symbol]:  # type: ignore[index]
+        for bar in bars[symbol]:
             out.append(
                 Bar(
                     symbol=symbol,

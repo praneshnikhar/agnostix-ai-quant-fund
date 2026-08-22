@@ -43,9 +43,9 @@ celery_app.conf.update(
 
 # Beat schedule: opt-in only.
 if os.environ.get("MARKET_INGESTION_SCHEDULE_ENABLED", "").lower() == "true":
-    watchlist = os.environ.get(
-        "MARKET_WATCHLIST", "AAPL,MSFT,NVDA,AMZN,GOOGL,META,TSLA,AMD"
-    ).split(",")
+    watchlist = os.environ.get("MARKET_WATCHLIST", "AAPL,MSFT,NVDA,AMZN,GOOGL,META,TSLA,AMD").split(
+        ","
+    )
     celery_app.conf.beat_schedule = {
         f"ingest-bars-{sym.strip().lower()}": {
             "task": "ingest_bars",

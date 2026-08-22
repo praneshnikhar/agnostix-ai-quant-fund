@@ -40,9 +40,7 @@ class Base(DeclarativeBase):
 
 
 def _uuid_pk() -> Mapped[uuid.UUID]:
-    return mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    return mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
 
 class TimestampMixin:
@@ -118,9 +116,7 @@ class Proposal(Base):
         String(32), default=ProposalStatus.PENDING_CRITIC.value, index=True
     )
 
-    __table_args__ = (
-        Index("ix_proposals_symbol_created", "symbol", "created_at"),
-    )
+    __table_args__ = (Index("ix_proposals_symbol_created", "symbol", "created_at"),)
 
 
 # ---------------------------------------------------------------------------
@@ -416,9 +412,7 @@ class MarketSnapshotRecord(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (
-        Index("ix_market_snapshots_symbol_time", "symbol", "snapshot_time"),
-    )
+    __table_args__ = (Index("ix_market_snapshots_symbol_time", "symbol", "snapshot_time"),)
 
 
 # ---------------------------------------------------------------------------
@@ -479,7 +473,11 @@ class FinancialMetricRecord(Base):
     __table_args__ = (
         Index(
             "uq_fin_metrics_identity",
-            "provider", "symbol", "metric", "period_type", "period_end",
+            "provider",
+            "symbol",
+            "metric",
+            "period_type",
+            "period_end",
             unique=True,
         ),
         Index("ix_fin_metrics_symbol_metric", "symbol", "metric", "period_end"),
@@ -513,7 +511,11 @@ class FinancialStatementRecord(Base):
     __table_args__ = (
         Index(
             "uq_fin_stmts_identity",
-            "provider", "symbol", "statement_type", "period_type", "period_end",
+            "provider",
+            "symbol",
+            "statement_type",
+            "period_type",
+            "period_end",
             unique=True,
         ),
         Index("ix_fin_stmts_symbol", "symbol", "period_end"),
@@ -546,7 +548,9 @@ class EarningsEventRecord(Base):
     )
 
     __table_args__ = (
-        Index("uq_earnings_identity", "provider", "symbol", "period_type", "period_end", unique=True),
+        Index(
+            "uq_earnings_identity", "provider", "symbol", "period_type", "period_end", unique=True
+        ),
         Index("ix_earnings_symbol_time", "symbol", "event_time"),
     )
 
@@ -645,9 +649,7 @@ class ResearchRun(Base):
     critic_verdict: Mapped[str | None] = mapped_column(String(16), index=True)
     error: Mapped[str | None] = mapped_column(Text)
 
-    __table_args__ = (
-        Index("ix_research_runs_symbol_created", "symbol", "created_at"),
-    )
+    __table_args__ = (Index("ix_research_runs_symbol_created", "symbol", "created_at"),)
 
 
 class ResearchFeedback(Base):
@@ -661,7 +663,9 @@ class ResearchFeedback(Base):
         UUID(as_uuid=True), ForeignKey("research_runs.id"), nullable=False, index=True
     )
     user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    decision: Mapped[str] = mapped_column(String(24), nullable=False)  # approve|reject|request_revision
+    decision: Mapped[str] = mapped_column(
+        String(24), nullable=False
+    )  # approve|reject|request_revision
     notes: Mapped[str | None] = mapped_column(Text)
     decided_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

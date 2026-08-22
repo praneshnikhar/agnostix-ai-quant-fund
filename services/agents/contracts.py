@@ -57,9 +57,7 @@ ROLE_PERMISSIONS: dict[AgentRole, frozenset[ToolPermission]] = {
             ToolPermission.VERIFY_EVIDENCE,
         }
     ),
-    AgentRole.RISK: frozenset(
-        {ToolPermission.READ_PORTFOLIO, ToolPermission.EVALUATE_RISK_RULES}
-    ),
+    AgentRole.RISK: frozenset({ToolPermission.READ_PORTFOLIO, ToolPermission.EVALUATE_RISK_RULES}),
     # Execution permission is granted ONLY at runtime with a valid
     # authorization event; it is never part of a static default.
     AgentRole.EXECUTION: frozenset({ToolPermission.READ_PORTFOLIO}),
@@ -70,17 +68,15 @@ ROLE_PERMISSIONS: dict[AgentRole, frozenset[ToolPermission]] = {
 class AgentSpec(BaseModel):
     """Static definition of an agent."""
 
-    agent_id: str                      # e.g. "momentum_agent"
-    version: str                       # e.g. "v1"
+    agent_id: str  # e.g. "momentum_agent"
+    version: str  # e.g. "v1"
     role: AgentRole
     description: str = ""
-    input_schema_name: str             # registered contract name for inputs
-    output_schema_name: str            # registered contract name for outputs
-    model_class: str = "standard"      # gateway ModelClass hint
+    input_schema_name: str  # registered contract name for inputs
+    output_schema_name: str  # registered contract name for outputs
+    model_class: str = "standard"  # gateway ModelClass hint
     prompt_version: str = "v0"
-    tool_permissions: frozenset[ToolPermission] = Field(
-        default_factory=frozenset
-    )
+    tool_permissions: frozenset[ToolPermission] = Field(default_factory=frozenset)
 
     @property
     def qualified_id(self) -> str:

@@ -134,9 +134,9 @@ def build_fundamental_context(
     )
     top_annual_ends = list({m.period.period_end for m in annual})[:MAX_ANNUAL_PERIODS]
     top_q_ends = list({m.period.period_end for m in quarterly})[:MAX_QUARTER_PERIODS]
-    selected = [
-        m for m in annual if m.period.period_end in top_annual_ends
-    ] + [m for m in quarterly if m.period.period_end in top_q_ends]
+    selected = [m for m in annual if m.period.period_end in top_annual_ends] + [
+        m for m in quarterly if m.period.period_end in top_q_ends
+    ]
     # deterministic order: period end desc, metric name asc
     selected.sort(key=lambda m: (m.period.period_end, m.metric), reverse=True)
     metric_names = {m.metric for m in selected}
@@ -146,9 +146,15 @@ def build_fundamental_context(
 
     if profile is None:
         unavailable.append("company_profile")
-        status.append(FundamentalDataStatus(datatype="profile", symbol=symbol.upper(), state=DataQuality.UNAVAILABLE))
+        status.append(
+            FundamentalDataStatus(
+                datatype="profile", symbol=symbol.upper(), state=DataQuality.UNAVAILABLE
+            )
+        )
     else:
-        status.append(FundamentalDataStatus(datatype="profile", symbol=symbol.upper(), state=DataQuality.OK))
+        status.append(
+            FundamentalDataStatus(datatype="profile", symbol=symbol.upper(), state=DataQuality.OK)
+        )
 
     status.append(
         FundamentalDataStatus(
@@ -166,22 +172,40 @@ def build_fundamental_context(
     ]
     if not earnings_sorted:
         unavailable.append("earnings")
-        status.append(FundamentalDataStatus(datatype="earnings", symbol=symbol.upper(), state=DataQuality.UNAVAILABLE))
+        status.append(
+            FundamentalDataStatus(
+                datatype="earnings", symbol=symbol.upper(), state=DataQuality.UNAVAILABLE
+            )
+        )
     else:
-        status.append(FundamentalDataStatus(datatype="earnings", symbol=symbol.upper(), state=DataQuality.OK))
+        status.append(
+            FundamentalDataStatus(datatype="earnings", symbol=symbol.upper(), state=DataQuality.OK)
+        )
 
     if valuation is None:
         unavailable.append("valuation")
-        status.append(FundamentalDataStatus(datatype="valuation", symbol=symbol.upper(), state=DataQuality.UNAVAILABLE))
+        status.append(
+            FundamentalDataStatus(
+                datatype="valuation", symbol=symbol.upper(), state=DataQuality.UNAVAILABLE
+            )
+        )
     else:
-        status.append(FundamentalDataStatus(datatype="valuation", symbol=symbol.upper(), state=DataQuality.OK))
+        status.append(
+            FundamentalDataStatus(datatype="valuation", symbol=symbol.upper(), state=DataQuality.OK)
+        )
 
     docs = _rank_documents(documents or [], now)[:MAX_DOCUMENTS]
     if not docs:
         unavailable.append("research_documents")
-        status.append(FundamentalDataStatus(datatype="documents", symbol=symbol.upper(), state=DataQuality.UNAVAILABLE))
+        status.append(
+            FundamentalDataStatus(
+                datatype="documents", symbol=symbol.upper(), state=DataQuality.UNAVAILABLE
+            )
+        )
     else:
-        status.append(FundamentalDataStatus(datatype="documents", symbol=symbol.upper(), state=DataQuality.OK))
+        status.append(
+            FundamentalDataStatus(datatype="documents", symbol=symbol.upper(), state=DataQuality.OK)
+        )
 
     news_items = (news or [])[:MAX_NEWS]
 
@@ -210,8 +234,7 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
     labeled so the model cannot mistake absence for zero.
     """
     lines: list[str] = [
-        f"COMPANY: {ctx.company_profile.name if ctx.company_profile else 'UNKNOWN'} "
-        f"({ctx.symbol})",
+        f"COMPANY: {ctx.company_profile.name if ctx.company_profile else 'UNKNOWN'} ({ctx.symbol})",
         f"CONTEXT_VERSION: {ctx.context_version}  HASH: {ctx.context_hash}",
     ]
     if ctx.company_profile:
@@ -229,7 +252,8 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
     for m in ctx.financial_metrics:
         per = m.period
         ident = (
-            f"FY{per.fiscal_year}" if per.period_type.value == "annual"
+            f"FY{per.fiscal_year}"
+            if per.period_type.value == "annual"
             else f"FY{per.fiscal_year}Q{per.fiscal_quarter}"
         )
         val = "unavailable" if m.value is None else f"{m.value:,.4f}"
@@ -277,13 +301,13 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
     lines.append("\nRESEARCH DOCUMENTS (only these documents exist for you):")
     if not ctx.documents:
         lines.append("  unavailable")
-    for d in ctx.documents:
+    for doc in ctx.documents:
         lines.append(
-            f"  [{d.document_id}] {d.title} ({d.document_type.value}, "
-            f"published={d.published_at.date()}, source={d.source or 'unavailable'})"
+            f"  [{doc.document_id}] {doc.title} ({doc.document_type.value}, "
+            f"published={doc.published_at.date()}, source={doc.source or 'unavailable'})"
         )
-        if d.content:
-            lines.append(f"    content: {d.content}")
+        if doc.content:
+            lines.append(f"    content: {doc.content}")
 
     if ctx.news:
         lines.append("\nRECENT NEWS:")
@@ -293,7 +317,9 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
             )
 
     if ctx.market_snapshot_summary:
-        lines.append(f"\nMARKET SNAPSHOT: {json.dumps(ctx.market_snapshot_summary, sort_keys=True)}")
+        lines.append(
+            f"\nMARKET SNAPSHOT: {json.dumps(ctx.market_snapshot_summary, sort_keys=True)}"
+        )
 
     lines.append("\nDATA GAPS (explicitly unavailable — do NOT invent values for these):")
     lines.append(f"  {', '.join(ctx.unavailable) if ctx.unavailable else 'none'}")

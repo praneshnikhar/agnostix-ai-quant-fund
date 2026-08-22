@@ -39,9 +39,7 @@ class FundamentalsProvider(ABC):
 
 class EarningsProvider(ABC):
     @abstractmethod
-    def get_earnings_events(
-        self, symbol: str, limit: int = 12
-    ) -> list[EarningsEvent]: ...
+    def get_earnings_events(self, symbol: str, limit: int = 12) -> list[EarningsEvent]: ...
 
 
 class ValuationProvider(ABC):

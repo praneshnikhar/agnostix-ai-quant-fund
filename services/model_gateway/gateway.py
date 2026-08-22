@@ -51,9 +51,7 @@ class ModelGateway:
         telemetry: TelemetrySink | None = None,
         routing_preference: list[str] | None = None,
     ) -> None:
-        self._adapters: dict[str, ProviderAdapter] = {
-            a.name: a for a in (adapters or [])
-        }
+        self._adapters: dict[str, ProviderAdapter] = {a.name: a for a in (adapters or [])}
         self.telemetry = telemetry or TelemetrySink()
         # Preference order; first configured provider wins unless overridden.
         self._routing_preference = routing_preference or [
@@ -169,6 +167,6 @@ class ModelGateway:
         if not response.content:
             return None
         try:
-            return json.loads(response.content)  # type: ignore[no-any-return]
+            return json.loads(response.content)
         except json.JSONDecodeError:
             return None

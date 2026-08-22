@@ -40,12 +40,11 @@ def _derive(
     compute,
 ) -> DerivedMetric | None:
     """Run `compute` over input values; None inputs => unavailable result."""
-    if any(i is None for i in inputs):
+    if any(i is None or i.value is None for i in inputs):
         return None
     values = [i.value for i in inputs]
-    assert all(v is not None for v in values)
     try:
-        value = compute(*values)  # type: ignore[misc]
+        value = compute(*values)
     except ZeroDivisionError:
         return None
     if value is None or value != value:
@@ -77,7 +76,9 @@ def revenue_growth_yoy(
 ) -> DerivedMetric | None:
     """YoY revenue growth: (rev_t - rev_prior) / |rev_prior|."""
     idx = _index(metrics)
-    cur = _get(idx, metrics[0].symbol if metrics else "", "revenue", period_type, current_period_end)
+    cur = _get(
+        idx, metrics[0].symbol if metrics else "", "revenue", period_type, current_period_end
+    )
     pri = _get(idx, metrics[0].symbol if metrics else "", "revenue", period_type, prior_period_end)
     if cur is None or pri is None:
         return None
@@ -154,7 +155,9 @@ def free_cash_flow(
     )
 
 
-def earnings_surprise(actual: float | None, estimate: float | None) -> tuple[float | None, float | None]:
+def earnings_surprise(
+    actual: float | None, estimate: float | None
+) -> tuple[float | None, float | None]:
     """Deterministic surprise: (actual-estimate, surprise/|estimate|).
 
     Returns (None, None) when either input is missing — no guessing.
