@@ -26,6 +26,7 @@ class ToolPermission(StrEnum):
 
     READ_MARKET_DATA = "read_market_data"
     READ_NEWS = "read_news"
+    READ_SNAPSHOT = "read_snapshot"  # M1: normalized market snapshot access
     READ_PORTFOLIO = "read_portfolio"
     SUBMIT_PROPOSAL = "submit_proposal"
     EVALUATE_RISK_RULES = "evaluate_risk_rules"
@@ -36,7 +37,11 @@ class ToolPermission(StrEnum):
 # Role → default permission mapping (least privilege by construction).
 ROLE_PERMISSIONS: dict[AgentRole, frozenset[ToolPermission]] = {
     AgentRole.RESEARCH: frozenset(
-        {ToolPermission.READ_MARKET_DATA, ToolPermission.READ_NEWS}
+        {
+            ToolPermission.READ_MARKET_DATA,
+            ToolPermission.READ_NEWS,
+            ToolPermission.READ_SNAPSHOT,
+        }
     ),
     AgentRole.SIGNAL: frozenset(
         {
