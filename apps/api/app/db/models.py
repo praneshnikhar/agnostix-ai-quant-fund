@@ -28,6 +28,7 @@ from sqlalchemy import (
     String,
     Text,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -253,16 +254,188 @@ class AgentEvent(Base):
     )
 
 
+# ---------------------------------------------------------------------------
+# M1 — market intelligence
+# ---------------------------------------------------------------------------
+
+
+class Security(Base):
+    """Reference metadata for tradable symbols."""
+
+    __tablename__ = "securities"
+
+    symbol: Mapped[str] = mapped_column(Text, primary_key=True)
+    name: Mapped[str | None] = mapped_column(Text)
+    exchange: Mapped[str | None] = mapped_column(Text)
+    asset_class: Mapped[str] = mapped_column(String(32), default="us_equity")
+    status: Mapped[str] = mapped_column(String(16), default="active")
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_symbol_id: Mapped[str | None] = mapped_column(Text)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class MarketBar(Base):
+    """OHLCV bar. Idempotent on (provider, symbol, timeframe, event_time)."""
+
+    __tablename__ = "market_bars"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    open: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    high: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    low: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    close: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    volume: Mapped[float] = mapped_column(Numeric(24, 8), nullable=False)
+    trade_count: Mapped[int | None]
+    vwap: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_market_bars_identity",
+            "provider",
+            "symbol",
+            "timeframe",
+            "event_time",
+            unique=True,
+        ),
+        Index("ix_market_bars_symbol_tf_time", "symbol", "timeframe", "event_time"),
+    )
+
+
+class Quote(Base):
+    """Quote tick. No uniqueness constraint by design: quotes are an
+    append-only tick stream; deduplication would add write cost without
+    analytical benefit. Freshness is judged by event_time, not row count."""
+
+    __tablename__ = "quotes"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    bid_price: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    bid_size: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    ask_price: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    ask_size: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    last_price: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_quotes_symbol_time", "symbol", "event_time"),)
+
+
+class TradeRecord(Base):
+    """Trade print. Deduplicated on the provider's trade id when present."""
+
+    __tablename__ = "trades"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    price: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    size: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    conditions: Mapped[list | None] = mapped_column(JSONB)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_trade_id: Mapped[str | None] = mapped_column(Text)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_trades_provider_tid",
+            "provider",
+            "provider_trade_id",
+            unique=True,
+            postgresql_where=text("provider_trade_id IS NOT NULL"),
+        ),
+        Index("ix_trades_symbol_time", "symbol", "event_time"),
+    )
+
+
+class NewsArticleRecord(Base):
+    """Normalized news article. First-write-wins on (provider, article id):
+    original publication data is never overwritten by re-ingestion."""
+
+    __tablename__ = "news_articles"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_article_id: Mapped[str] = mapped_column(Text, nullable=False)
+    headline: Mapped[str] = mapped_column(Text, nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str | None] = mapped_column(Text)
+    symbols: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("uq_news_identity", "provider", "provider_article_id", unique=True),
+        Index("ix_news_published_at", "published_at"),
+        Index("ix_news_symbols_gin", "symbols", postgresql_using="gin"),
+    )
+
+
+class MarketSnapshotRecord(Base):
+    """Persisted point-in-time snapshot payload (full JSONB incl.
+    data_quality). Snapshots are immutable once written."""
+
+    __tablename__ = "market_snapshots"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    snapshot_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    overall_state: Mapped[str] = mapped_column(String(16), nullable=False)
+    provider_status: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("ix_market_snapshots_symbol_time", "symbol", "snapshot_time"),
+    )
+
+
 __all__ = [
     "AgentEvent",
     "Base",
     "CriticReview",
     "HumanDecision",
+    "MarketBar",
+    "MarketSnapshotRecord",
+    "NewsArticleRecord",
     "Order",
     "PortfolioSnapshot",
     "Position",
     "Proposal",
     "ProposalStatus",
+    "Quote",
+    "Security",
+    "TradeRecord",
     "User",
     "UserRole",
 ]
