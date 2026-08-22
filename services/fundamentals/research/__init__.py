@@ -1,0 +1,1 @@
+"""Fundamental research intelligence (M2): agent, critic, evaluation."""
