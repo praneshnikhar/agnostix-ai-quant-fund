@@ -1,5 +1,45 @@
 
-## [M1] Market Intelligence Foundation
+## [M2] Fundamental AI Intelligence
+
+### Added
+- services/fundamentals: typed domain schemas (CompanyProfile,
+  FinancialMetric, FinancialPeriod, statements, EarningsEvent/Result,
+  ValuationSnapshot, FundamentalDataStatus, ResearchDocument)
+- Provider abstractions (FundamentalsProvider, CompanyDataProvider,
+  EarningsProvider, ValuationProvider, DocumentsProvider) with a fully
+  deterministic fixture implementation; no third-party fundamentals API
+  is required or fabricated
+- Deterministic derived metrics (revenue growth, margins, net debt, FCF,
+  earnings surprises) with formula + inputs + timestamp provenance
+- Data validation/quality flagging: conflicts preserved, never corrected;
+  period/currency/unit/timestamp integrity rules
+- FundamentalResearchContext builder: bounded, deterministic, versioned +
+  content-hashed context with explicit data-gap reporting
+- FundamentalResearchAgent (structured InvestmentThesis output: view,
+  confidence, facts/interpretation/conclusion separation, evidence refs,
+  catalysts, risks, bear case, invalidation conditions) via Model Gateway
+- FundamentalResearchCritic: deterministic grounding checks are
+  authoritative (evidence existence, numerical traceability, calibration);
+  optional LLM review can only escalate, never downgrade
+- Model evaluation harness (per-run records: provider/model/prompt
+  version/latency/success/schema validity/critic verdict) + report summary
+- Research event persistence (research_requested → research_completed)
+- PostgreSQL migration 0003 (fundamental intelligence schema incl.
+  research_runs and human-feedback foundation table)
+- /research API endpoints (read-only GETs + POST run; no order capability)
+- Web research workspace (/research, /research/[symbol]) with thesis,
+  financials, earnings, evidence, critic verdict, model metadata,
+  history comparison, loading/empty/error/insufficient-data states
+
+### Security
+- Research agents hold read/write-research permissions only; PLACE_ORDER
+  and MODIFY_PORTFOLIO remain ungranted. No execution path exists in M2.
+
+### Fixed
+- Alembic now normalizes the async (+asyncpg) DB URL to psycopg2 for
+  synchronous migration execution.
+
+[M1] Market Intelligence Foundation
 
 ### Added
 - services/market_data: schemas, normalization, validation, freshness,
