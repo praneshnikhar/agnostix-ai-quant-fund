@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* =============================================================================
+   Design tokens — institutional dark terminal + modern AI workspace
+   See documents/16_Design_System_Direction.md
+   ============================================================================= */
+:root {
+  /* Surfaces */
+  --bg: #0a0c10;            /* dark graphite background */
+  --surface: #0e1116;       /* near-black panels */
+  --elevated: #141922;      /* elevated surfaces */
+
+  /* Borders — restrained hairlines */
+  --border: #1d232e;
+  --border-strong: #2a3240;
+
+  /* Text hierarchy */
+  --text-primary: #e8ecf2;
+  --text-secondary: #9aa4b2;
+  --text-muted: #5c6675;
+
+  /* Semantic status colors (muted, not decorative) */
+  --positive: #34b27b;
+  --negative: #e05c5c;
+  --warning: #d9a13f;
+  --info: #4a8fd4;
+
+  /* Single restrained accent for interactive elements */
+  --accent: #5b8def;
+
+  /* Chart palette */
+  --chart-1: #5b8def;
+  --chart-2: #34b27b;
+  --chart-3: #d9a13f;
+  --chart-4: #9a6ee0;
+  --chart-5: #e05c5c;
+}
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--text-primary);
+}
+
+body {
+  font-feature-settings: "cv02", "cv03", "cv04";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular numerals for all metric/price displays */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono, ui-monospace), monospace;
+}

@@ -1,0 +1,98 @@
+# =============================================================================
+# AI Quant Fund — Local Development Environment (M0)
+# Reproducible from a clean machine: `docker compose up --build`
+# Services: postgres (pgvector), redis, api, worker, web
+# No live trading. Alpaca credentials are injected via environment only.
+# =============================================================================
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: fund-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fund}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+      POSTGRES_DB: ${POSTGRES_DB:-fund}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fund} -d ${POSTGRES_DB:-fund}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: fund-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: fund-api
+    env_file:
+      - .env
+    environment:
+      API_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-fund}:${POSTGRES_PASSWORD:-change-me-local-only}@postgres:5432/${POSTGRES_DB:-fund}
+      API_REDIS_URL: redis://redis:6379/0
+      PYTHONPATH: /workspace/apps/api:/workspace/services
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --app-dir apps/api
+    volumes:
+      - ./apps/api:/workspace/apps/api
+      - ./services:/workspace/services
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    container_name: fund-worker
+    env_file:
+      - .env
+    environment:
+      API_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-fund}:${POSTGRES_PASSWORD:-change-me-local-only}@postgres:5432/${POSTGRES_DB:-fund}
+      API_REDIS_URL: redis://redis:6379/0
+      PYTHONPATH: /workspace/apps/api:/workspace/services
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A app.worker.celery_app worker --loglevel=INFO --app-dir apps/api
+    volumes:
+      - ./apps/api:/workspace/apps/api
+      - ./services:/workspace/services
+
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    container_name: fund-web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_WS_URL: ws://localhost:8000/ws
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    volumes:
+      - ./apps/web:/workspace/apps/web
+      - /workspace/apps/web/node_modules
+
+volumes:
+  postgres_data:

@@ -1,0 +1,1103 @@
+# .CLINERULES — Engineering & Agent-Development Contract
+
+You are setting up the engineering governance layer for an **AI-native quantitative investment platform**.
+
+This file is the **authoritative engineering and agent-development contract** for Cline and all Cline sub-agents working on this repository. It takes precedence over ad-hoc instructions when they conflict, unless the user explicitly overrides it.
+
+Do not implement application functionality beyond the currently authorized milestone.
+
+---
+
+# 1. PROJECT CONTEXT
+
+We are building an AI-native quantitative investment platform.
+
+The long-term system will contain:
+
+```text
+Market / Financial Data
+        ↓
+Data Normalization
+        ↓
+Market Snapshots
+        ↓
+AI Research Agents
+        ↓
+Quantitative Strategy Agents
+        ↓
+Signal Aggregation
+        ↓
+Bull / Bear / Risk Debate
+        ↓
+Investment Committee
+        ↓
+Portfolio Construction
+        ↓
+Deterministic Risk Engine
+        ↓
+Human Governance
+        ↓
+Paper Execution
+        ↓
+Portfolio Monitoring
+        ↓
+Outcome Evaluation
+        ↓
+Learning / Model Improvement
+        ↓
+Strategy / Model Promotion
+```
+
+The initial implementation is paper-trading only.
+
+Alpaca MCP is available for one month and will be used during development, but the application must remain architecturally capable of using Alpaca's normal API/SDK as a fallback.
+
+The project must eventually support AI agents, conventional quantitative models, backtesting, portfolio management, risk management, execution, and continuous model/strategy evaluation.
+
+---
+
+# 2. SOURCE OF TRUTH
+
+The repository contains the following project requirements documents (located in `documents/`):
+
+```text
+documents/01_PRD.md
+documents/02_FRD.md
+documents/03_TechStack.md
+documents/04_Schemas.md
+documents/05_Development_Plan.md
+documents/06_RL_Improvement.md
+```
+
+Cline MUST read and understand these documents before making architectural or implementation decisions.
+
+These documents define the existing project baseline.
+
+Do not silently contradict them.
+
+If an architectural improvement is required, preserve the original requirement while improving the implementation architecture.
+
+Important existing principles include:
+
+* human-in-the-loop execution
+* paper trading
+* deterministic risk checks
+* separate signal and critic responsibilities
+* auditability
+* structured agent contracts
+* future RL/learning capability
+* Alpaca integration
+* agent tool permission boundaries
+
+Companion architecture documents (`documents/07_AIFund_Vision.md` through `documents/18_M0_Specification_Cline_Prompt.md`) extend this baseline; where they refine (not contradict) the originals, follow them.
+
+---
+
+# 3. CORE ENGINEERING PRINCIPLES
+
+## 3.1 Build for the final architecture without overbuilding
+
+Design the codebase so that it can evolve into a serious AI quantitative platform.
+
+However:
+
+DO NOT introduce infrastructure merely because it might be needed someday.
+
+Prefer:
+
+```text
+simple
+→ modular
+→ measurable
+→ replaceable
+→ scalable when justified
+```
+
+over:
+
+```text
+complex
+→ distributed
+→ difficult to operate
+→ speculative
+```
+
+---
+
+# 4. MONOREPO PRINCIPLES
+
+Use a clean monorepo architecture.
+
+Keep clear boundaries between:
+
+```text
+Frontend
+Backend API
+Agents
+Market Data
+Execution
+Portfolio
+Risk
+Backtesting
+Evaluation
+Model Gateway
+Research
+Database
+Infrastructure
+```
+
+Do not create circular dependencies.
+
+Domain logic must not depend directly on frontend code.
+
+Agent logic must not contain database implementation details when a service/repository abstraction is appropriate.
+
+Business logic must not be tightly coupled to a specific AI provider.
+
+---
+
+# 5. AI MODEL ARCHITECTURE
+
+The platform MUST be model-provider agnostic.
+
+Never scatter direct calls such as:
+
+```python
+anthropic.messages.create(...)
+```
+
+or:
+
+```python
+openai.chat.completions.create(...)
+```
+
+throughout agent code.
+
+All model access must go through a model gateway/provider abstraction.
+
+Conceptually:
+
+```text
+Agent
+   ↓
+Model Gateway
+   ↓
+Provider Adapter
+   ├── Anthropic
+   ├── OpenAI
+   └── Ollama / Local
+```
+
+The model gateway should eventually support:
+
+* model routing
+* structured outputs
+* provider selection
+* model versioning
+* prompt versioning
+* token tracking
+* latency tracking
+* estimated cost tracking
+* failure handling
+
+Use expensive reasoning models only where they add meaningful value.
+
+Prefer conventional ML, deterministic algorithms, or cheaper/local models for appropriate workloads.
+
+---
+
+# 6. LLM VS QUANTITATIVE COMPUTATION
+
+Never assume an LLM should perform numerical computation.
+
+Use deterministic code or quantitative ML for:
+
+* risk limits
+* portfolio exposure
+* position sizing constraints
+* leverage
+* drawdown
+* volatility
+* correlation
+* portfolio statistics
+* technical indicators
+* backtesting
+* performance metrics
+* optimization
+* numerical validation
+
+LLMs are appropriate for:
+
+* research synthesis
+* unstructured information
+* news interpretation
+* document analysis
+* qualitative reasoning
+* investment thesis generation
+* debate
+* explanation
+
+An LLM MUST NOT be the sole authority for hard financial risk constraints.
+
+---
+
+# 7. FINANCIAL SAFETY RULES
+
+This is a trading system.
+
+Safety takes precedence over convenience.
+
+During development:
+
+```text
+PAPER TRADING ONLY
+```
+
+Never implement real-money execution unless explicitly authorized in a future milestone.
+
+Never expose brokerage credentials to the frontend.
+
+Never commit secrets.
+
+Never print API keys, tokens, passwords, or credentials in logs.
+
+Never allow a research agent to directly place orders.
+
+Never allow an LLM to bypass deterministic risk rules.
+
+Execution must eventually require a valid authorization/approval event.
+
+The eventual execution architecture must resemble:
+
+```text
+Signal
+ ↓
+Critic
+ ↓
+Risk
+ ↓
+Human Approval
+ ↓
+Execution
+```
+
+not:
+
+```text
+LLM
+ ↓
+Order
+```
+
+---
+
+# 8. ALPACA RULES
+
+Alpaca is the initial brokerage/data provider.
+
+Use abstraction boundaries:
+
+```text
+Broker
+ └── AlpacaBroker
+
+MarketDataProvider
+ └── AlpacaMarketDataProvider
+```
+
+Do not scatter Alpaca-specific code throughout the application.
+
+Alpaca MCP must be treated as an integration layer rather than the application's domain model.
+
+Conceptually:
+
+```text
+Agent / Service
+       ↓
+Tool Gateway
+       ↓
+Alpaca MCP
+```
+
+and where appropriate:
+
+```text
+Service
+       ↓
+Alpaca SDK/API
+```
+
+The system must remain capable of operating if Alpaca MCP is unavailable.
+
+---
+
+# 9. AGENT RULES
+
+Agents must be specialized.
+
+Do not create a single giant "trading agent".
+
+The eventual system should support specialized roles such as:
+
+```text
+Research Agent
+Fundamental Agent
+News Agent
+Momentum Agent
+Mean-Reversion Agent
+Macro Agent
+Critic Agent
+Bull Agent
+Bear Agent
+Risk Agent
+Portfolio Agent
+Execution Agent
+Monitoring Agent
+Evaluation Agent
+```
+
+Each agent should have:
+
+* unique identifier
+* version
+* explicit capability definition
+* input contract
+* output contract
+* tool permissions
+* model configuration
+* event logging
+
+Agents should communicate through typed contracts.
+
+Avoid unstructured agent-to-agent text when structured data is appropriate.
+
+---
+
+# 10. AGENT PERMISSIONS
+
+Follow least privilege.
+
+Example:
+
+```text
+Research Agents
+    READ market/research data
+    NO execution
+
+Signal Agents
+    READ market/research data
+    SUBMIT proposals
+    NO execution
+
+Critic
+    READ data
+    VERIFY evidence
+    EVALUATE risk
+    NO execution
+
+Risk Engine
+    READ portfolio
+    EVALUATE deterministic rules
+    NO execution
+
+Execution Agent
+    EXECUTION capability
+    ONLY after valid authorization
+```
+
+Never grant broad tool access simply because it is convenient.
+
+---
+
+# 11. DATA PROVENANCE
+
+Every important AI decision should eventually be reproducible.
+
+When an agent produces a signal, preserve enough information to determine:
+
+```text
+What did the agent see?
+What model was used?
+What prompt/version was used?
+What data snapshot was used?
+What tools were used?
+What did the agent produce?
+What happened afterward?
+```
+
+Distinguish:
+
+* historical data
+* delayed data
+* real-time data
+* cached data
+* simulated data
+
+Never silently treat stale data as current.
+
+---
+
+# 12. AUDITABILITY
+
+The system must maintain an append-only event trail for important state transitions.
+
+Eventually support:
+
+```text
+data_pull
+research_created
+signal_created
+critic_reviewed
+risk_checked
+human_decision
+order_submitted
+order_filled
+position_changed
+kill_switch_triggered
+evaluation_completed
+model_promoted
+```
+
+Audit events should contain:
+
+* timestamp
+* event type
+* actor/agent
+* relevant entity
+* structured payload
+* correlation/proposal ID where applicable
+
+Do not use normal application logs as a substitute for the audit trail.
+
+---
+
+# 13. DATABASE RULES
+
+PostgreSQL is the primary relational database.
+
+Use:
+
+* SQLAlchemy
+* Alembic
+* typed schemas
+* migrations
+
+Do not introduce MongoDB or another database without a demonstrated requirement.
+
+Do not create duplicate sources of truth.
+
+For example:
+
+```text
+Alpaca
+    = source of truth for actual brokerage account state
+
+PostgreSQL
+    = source of truth for application state/audit/research metadata
+```
+
+Respect source-of-truth boundaries.
+
+---
+
+# 14. REDIS / WORKER RULES
+
+Redis may be used for:
+
+* queues
+* caching
+* coordination
+* locks
+* rate limiting
+
+Do not use Redis as the permanent source of truth for financial records.
+
+Long-running AI/data workloads should not block FastAPI request handlers.
+
+Use workers for appropriate asynchronous workloads.
+
+---
+
+# 15. API RULES
+
+FastAPI is the backend API layer.
+
+API contracts must be explicit.
+
+Use Pydantic schemas.
+
+Validate all external input.
+
+Do not expose internal database objects directly if a public API schema is more appropriate.
+
+Keep:
+
+```text
+API schema
+Domain model
+Database model
+```
+
+appropriately separated.
+
+---
+
+# 16. FRONTEND RULES
+
+The frontend should feel like a **premium institutional trading terminal combined with a modern AI workspace**.
+
+Design priorities:
+
+1. clarity
+2. information hierarchy
+3. speed
+4. density where useful
+5. excellent typography
+6. consistent spacing
+7. accessibility
+8. responsive behavior
+9. subtle motion
+10. visual polish
+
+Avoid:
+
+* generic SaaS dashboard design
+* excessive rounded cards
+* excessive gradients
+* excessive shadows
+* meaningless animations
+* crypto-style neon aesthetics
+* fake AI effects
+* giant empty spaces
+* fabricated financial metrics
+
+Never display fake performance data as if it were real.
+
+For prototypes, clearly label mock/demo data.
+
+---
+
+# 17. FRONTEND DESIGN SYSTEM
+
+Use reusable design tokens and components.
+
+Prefer:
+
+```text
+Design Token
+    ↓
+Primitive
+    ↓
+Reusable Component
+    ↓
+Feature Component
+    ↓
+Page
+```
+
+Do not repeatedly hand-style identical UI elements.
+
+Use a consistent visual language for:
+
+* positive
+* negative
+* warning
+* neutral
+* active
+* disabled
+* pending
+* executing
+* completed
+* rejected
+
+---
+
+# 18. REAL-TIME UI
+
+The platform will eventually require live updates for:
+
+* prices
+* positions
+* orders
+* proposals
+* agent activity
+* portfolio state
+* risk state
+
+Design realtime functionality around explicit event contracts.
+
+Do not create arbitrary frontend polling loops when an event-driven solution is appropriate.
+
+---
+
+# 19. TESTING
+
+No meaningful feature is complete without tests.
+
+Use the appropriate testing layer:
+
+```text
+Unit
+Integration
+Contract
+End-to-End
+```
+
+Tests must be deterministic.
+
+Never make normal CI depend on:
+
+* live market conditions
+* external API availability
+* real brokerage execution
+* expensive LLM calls
+
+Use mocks/fakes for external dependencies.
+
+Create separate explicitly controlled integration tests for external providers.
+
+---
+
+# 20. CODE QUALITY
+
+Prefer:
+
+* small modules
+* explicit dependencies
+* dependency injection
+* strong typing
+* pure functions
+* testable services
+* clear interfaces
+* descriptive names
+* single responsibility
+
+Avoid:
+
+* god classes
+* giant files
+* hidden global state
+* magic constants
+* duplicated integrations
+* circular imports
+* unnecessary abstractions
+* speculative frameworks
+* dead code
+
+Do not optimize prematurely.
+
+Do not refactor unrelated code merely because you prefer another style.
+
+---
+
+# 21. DEPENDENCY MANAGEMENT
+
+Keep dependencies minimal.
+
+Before adding a package, ask:
+
+1. Do we actually need it?
+2. Is there already an existing dependency that solves the problem?
+3. Is it maintained?
+4. Does it create unnecessary operational complexity?
+5. Does it introduce security or licensing concerns?
+6. Can a small internal implementation be better?
+
+Do not add future ML/RL dependencies during M0 unless actually required.
+
+---
+
+# 22. CLINE OPERATING RULES
+
+Cline must operate as an engineering agent, not a blind code generator.
+
+Before changing code:
+
+```text
+Inspect
+Understand
+Plan
+Implement
+Test
+Review
+```
+
+Never blindly overwrite existing work.
+
+Always inspect the current repository state first.
+
+Prefer incremental changes.
+
+Before major architectural changes, inspect:
+
+* existing code
+* documentation
+* dependencies
+* tests
+* migrations
+* configuration
+
+---
+
+# 23. SUB-AGENT RULES
+
+Sub-agents must receive bounded tasks.
+
+Each sub-agent must:
+
+1. inspect relevant existing files
+2. understand project architecture
+3. modify only its assigned scope
+4. avoid unrelated rewrites
+5. write/update tests
+6. run tests
+7. run lint/type checks where applicable
+8. document important decisions
+9. report files changed
+10. report unresolved problems
+
+Do not launch independent sub-agents simultaneously when they modify the same files or depend on each other's unfinished work.
+
+Respect dependency order.
+
+---
+
+# 24. SUB-AGENT HANDOFF
+
+When delegating work, provide the sub-agent with:
+
+```text
+Objective
+Context
+Relevant files
+Allowed scope
+Forbidden scope
+Acceptance criteria
+Testing requirements
+Expected deliverables
+```
+
+Never give a sub-agent vague instructions such as:
+
+```text
+"Build the backend."
+```
+
+Use bounded implementation tasks.
+
+---
+
+# 25. ORCHESTRATOR RULES
+
+The main Cline agent is responsible for reviewing sub-agent output.
+
+Never blindly trust:
+
+```text
+"Done."
+```
+
+After every sub-agent:
+
+```text
+Inspect diff
+↓
+Run tests
+↓
+Run lint/type checks
+↓
+Check architecture
+↓
+Check security
+↓
+Verify acceptance criteria
+```
+
+If work is incomplete, send it back for correction.
+
+Do not simply continue to the next milestone because a sub-agent claims success.
+
+---
+
+# 26. GIT RULES
+
+Create coherent commits.
+
+Prefer commits such as:
+
+```text
+chore: initialize repository foundation
+feat(api): add FastAPI foundation
+feat(db): add PostgreSQL and migrations
+feat(agents): add agent runtime foundation
+feat(ai): add model gateway
+feat(alpaca): add broker abstraction
+feat(web): add trading terminal shell
+```
+
+Do not create giant commits containing unrelated work.
+
+Never commit secrets.
+
+---
+
+# 27. DOCUMENTATION RULES
+
+Important architectural decisions must be documented.
+
+Maintain:
+
+```text
+README.md
+ARCHITECTURE.md
+DEVELOPMENT.md
+SECURITY.md
+DESIGN_SYSTEM.md
+DECISIONS.md
+CHANGELOG.md
+```
+
+Documentation should describe the current system, not imaginary future functionality.
+
+Clearly distinguish:
+
+```text
+Implemented
+Planned
+Experimental
+Mocked
+```
+
+---
+
+# 28. DEVELOPMENT MILESTONES
+
+The project should evolve through:
+
+```text
+M0  Foundation
+M1  Market Intelligence
+M2  Fundamental AI
+M3  Strategy Band
+M4  Investment Committee
+M5  Quant Risk
+M6  Portfolio Engine
+M7  Paper Execution
+M8  Learning Engine
+M9  Meta-Allocator
+M10 Production Fund Platform
+```
+
+Do not skip milestones casually.
+
+Do not implement later-stage functionality during an earlier milestone unless required as a foundation.
+
+---
+
+# 29. LEARNING / RL RULES
+
+The system should eventually learn from:
+
+* human decisions
+* executed trades
+* outcomes
+* market regimes
+* agent performance
+* strategy performance
+* calibration
+
+Do NOT immediately implement online RL against live markets.
+
+Prefer the progression:
+
+```text
+Logged outcomes
+↓
+Evaluation
+↓
+Few-shot / preference conditioning
+↓
+Historical replay
+↓
+Walk-forward validation
+↓
+Offline learning
+↓
+Strategy allocation
+↓
+Controlled promotion
+```
+
+Avoid reward functions based solely on raw P&L.
+
+Risk-adjusted evaluation is required.
+
+---
+
+# 30. MODEL PROMOTION
+
+No AI model or strategy should automatically become production merely because a backtest improved.
+
+Eventually require:
+
+```text
+Training
+↓
+Validation
+↓
+Walk-forward
+↓
+Out-of-sample
+↓
+Risk evaluation
+↓
+Paper trading
+↓
+Promotion decision
+```
+
+Always preserve model versions.
+
+Never overwrite a production model without versioning.
+
+---
+
+# 31. OBSERVABILITY
+
+Every major subsystem should expose enough telemetry to diagnose:
+
+* latency
+* failures
+* queue depth
+* agent runs
+* model calls
+* token usage
+* cost
+* data freshness
+* execution status
+
+Prefer structured logs.
+
+Avoid logging huge prompt/response payloads indiscriminately.
+
+Sensitive data must never enter logs.
+
+---
+
+# 32. COST OPTIMIZATION
+
+Cost efficiency is a core product requirement.
+
+Use:
+
+* caching
+* batching
+* deduplication
+* model routing
+* cheap models for simple tasks
+* local models where practical
+* conventional ML for numerical prediction
+* deterministic computation for deterministic problems
+
+Do not send every market event to an expensive LLM.
+
+Do not repeatedly retrieve identical data.
+
+Record AI usage costs so we can measure:
+
+```text
+cost per agent run
+cost per signal
+cost per investment thesis
+cost per executed trade
+```
+
+---
+
+# 33. NO FABRICATION
+
+Never fabricate:
+
+* market prices
+* P&L
+* trading results
+* model performance
+* backtest performance
+* execution results
+* data freshness
+* agent activity
+
+If data is unavailable, represent it as unavailable.
+
+If data is mocked, label it as mocked.
+
+If a result is simulated, label it as simulated.
+
+---
+
+# 34. M0 BOUNDARY
+
+During M0, establish infrastructure only.
+
+M0 may create interfaces for:
+
+* agents
+* Alpaca
+* MCP
+* model gateway
+* database
+* workers
+* frontend
+* events
+
+M0 must NOT implement actual:
+
+* trading strategies
+* autonomous investment decisions
+* RL
+* live execution
+* portfolio optimization
+* production investment committee logic
+
+The purpose of M0 is to create a clean foundation for those future milestones.
+
+---
+
+# 35. DEFINITION OF DONE
+
+A task is not complete merely because code exists.
+
+It is complete when:
+
+```text
+Implementation
++
+Tests
++
+Validation
++
+Documentation
++
+Security review
++
+Acceptance criteria
+```
+
+are satisfied.
+
+If any of these are missing, report the task as incomplete.
+
+---
+
+# 36. FINAL RULE
+
+When uncertain:
+
+**Prefer correctness, safety, modularity, reproducibility, and maintainability over speed.**
+
+Do not make architectural shortcuts that will compromise the eventual AI quantitative platform.
+
+Do not build a flashy demo at the expense of a sound system.
+
+Build the foundation of a serious product.
