@@ -8,13 +8,13 @@
    ============================================================================= */
 :root {
   /* Surfaces */
-  --bg: #0a0c10;            /* dark graphite background */
-  --surface: #0e1116;       /* near-black panels */
-  --elevated: #141922;      /* elevated surfaces */
+  --bg: #090c11;            /* graphite canvas */
+  --surface: #0d1219;       /* application surface */
+  --elevated: #151c26;      /* raised controls */
 
   /* Borders — restrained hairlines */
-  --border: #1d232e;
-  --border-strong: #2a3240;
+  --border: #202a36;
+  --border-strong: #344253;
 
   /* Text hierarchy */
   --text-primary: #e8ecf2;
@@ -47,6 +47,21 @@ body {
 body {
   font-feature-settings: "cv02", "cv03", "cv04";
   -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-color: var(--border);
+}
+
+button,
+a,
+input {
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--text-primary);
 }
 
 /* Tabular numerals for all metric/price displays */
