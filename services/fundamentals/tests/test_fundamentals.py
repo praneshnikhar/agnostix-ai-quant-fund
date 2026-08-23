@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
 
 from fundamentals.context import (
+    ContextNewsItem,
     build_fundamental_context,
     render_context_for_model,
 )
@@ -175,6 +176,11 @@ def test_fixture_providers_deterministic():
 
 
 def _full_context():
+    """A context with EVERY input present — fundamentals + M1 news/snapshot."""
+    from market_data.freshness import evaluate_freshness, load_thresholds_from_settings
+    from market_data.schemas import MarketSnapshot, NewsArticle, ProviderInfo
+    from market_data.snapshot import context_news_items, snapshot_research_summary
+
     fp = FixtureFundamentalsProvider()
     ep = FixtureEarningsProvider()
     vp = FixtureValuationProvider()
@@ -184,6 +190,40 @@ def _full_context():
     for e in ep.get_earnings_events("ACME"):
         s, p = earnings_surprise(e.eps_actual, e.eps_estimate)
         earnings.append(EarningsResult(event=e, eps_surprise=s, eps_surprise_pct=p))
+
+    # M2.1: fresh M1 news + a fresh bar so no datatype is reported missing.
+    art = NewsArticle(
+        provider_article_id="n-1",
+        headline="Acme raises full-year guidance",
+        source="Reuters",
+        url=None,
+        symbols=["ACME"],
+        published_at=NOW - timedelta(hours=1),
+        provider_info=ProviderInfo(provider="alpaca_news"),
+        received_at=NOW - timedelta(hours=1),
+    )
+    thresholds = load_thresholds_from_settings(None)
+    _, news_status = evaluate_freshness(
+        art.published_at, NOW, thresholds.for_datatype("news"), symbol="ACME", datatype="news"
+    )
+    bar_time = NOW - timedelta(hours=1)
+    _, bars_status = evaluate_freshness(
+        bar_time, NOW, thresholds.for_datatype("bars"), symbol="ACME", datatype="bars"
+    )
+    snap = MarketSnapshot(
+        symbol="ACME",
+        generated_at=NOW,
+        market={
+            "latest_bar": {
+                "event_time": bar_time,
+                "close": 91.20,
+                "provider": "alpaca_market_data",
+                "received_at": bar_time,
+            }
+        },
+        news=[art],
+        data_quality=[bars_status, news_status],
+    )
     return build_fundamental_context(
         "ACME",
         profile=fp.get_company_profile("ACME"),
@@ -191,6 +231,10 @@ def _full_context():
         earnings=earnings,
         valuation=vp.get_valuation_snapshot("ACME"),
         documents=dp.get_documents("ACME"),
+        news=[ContextNewsItem.model_validate(d) for d in context_news_items(snap.news)],
+        news_freshness=news_status.state.value,
+        market_snapshot_summary=snapshot_research_summary(snap),
+        market_snapshot_generated_at=snap.generated_at,
         now=NOW,
     )
 

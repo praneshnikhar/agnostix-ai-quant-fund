@@ -5,6 +5,18 @@ Agent. The model NEVER receives an opaque database dump: context is
 assembled from typed inputs with explicit budget limits and deterministic
 ranking, and carries a version + content hash so any research output can
 be traced back to exactly what the model saw.
+
+M2.1 integration: the context also carries M1 market intelligence —
+normalized news (full provenance) and a bounded MarketSnapshot projection
+(including discrete freshness states). Missing/stale inputs are represented
+explicitly; nothing is fabricated or silently omitted.
+
+CONTEXT_VERSION history:
+- m2-v1: fundamentals/earnings/valuation/documents only.
+- m2-v2: adds provenance-bearing news items, a bounded market-snapshot
+  summary with freshness states, and explicit news/market_snapshot gap
+  reporting. Version bumped because the hashed payload shape changed
+  materially; stored m2-v1 hashes remain interpretable against v1 code.
 """
 
 from __future__ import annotations
@@ -27,7 +39,7 @@ from fundamentals.schemas import (
 )
 from fundamentals.validation import period_sort_key
 
-CONTEXT_VERSION = "m2-v1"
+CONTEXT_VERSION = "m2-v2"
 
 # Deterministic context budget (§12): bounded, prioritized slices.
 MAX_ANNUAL_PERIODS = 5
@@ -47,14 +59,30 @@ _DOC_TYPE_PRIORITY = {
     "news": 0,
 }
 
+# Mapping from the M1 FreshnessState vocabulary onto the fundamentals-domain
+# DataQuality vocabulary used by data_status. Staleness is preserved via the
+# detail text — never silently upgraded to OK, never treated as missing.
+_FRESHNESS_TO_QUALITY: dict[str, DataQuality] = {
+    "fresh": DataQuality.OK,
+    "stale": DataQuality.INCOMPLETE,
+    "missing": DataQuality.UNAVAILABLE,
+    "invalid": DataQuality.INVALID,
+}
+
 
 class ContextNewsItem(BaseModel):
-    """Slim news reference included in context (from M1 news store)."""
+    """Slim, provenance-preserving news reference included in context
+    (projected from the M1 normalized news store)."""
 
+    provider_article_id: str
     headline: str
+    summary: str | None = None
     source: str | None = None
-    published_at: datetime
     url: str | None = None
+    symbols: list[str] = Field(default_factory=list)
+    published_at: datetime
+    received_at: datetime | None = None
+    provider: str | None = None
 
 
 class FundamentalResearchContext(BaseModel):
@@ -73,13 +101,19 @@ class FundamentalResearchContext(BaseModel):
     documents: list[ResearchDocument] = Field(default_factory=list)
     news: list[ContextNewsItem] = Field(default_factory=list)
     market_snapshot_summary: dict[str, Any] = Field(default_factory=dict)
+    # Provenance for WHEN the snapshot view was assembled — excluded from
+    # the content hash exactly like built_at (wall-clock, not data).
+    market_snapshot_generated_at: datetime | None = None
 
     data_status: list[FundamentalDataStatus] = Field(default_factory=list)
     unavailable: list[str] = Field(default_factory=list)  # explicit gaps
 
     def compute_hash(self) -> str:
         """Deterministic content hash over the canonical payload."""
-        payload = self.model_dump(mode="json", exclude={"context_hash", "built_at"})
+        payload = self.model_dump(
+            mode="json",
+            exclude={"context_hash", "built_at", "market_snapshot_generated_at"},
+        )
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         self.context_hash = hashlib.sha256(canonical.encode()).hexdigest()[:16]
         return self.context_hash
@@ -99,6 +133,23 @@ def _rank_documents(docs: list[ResearchDocument], now: datetime) -> list[Researc
     )
 
 
+def _select_news(items: list[ContextNewsItem]) -> list[ContextNewsItem]:
+    """Deterministic news selection (§12): dedupe by identity, newest-first
+    ordering with a stable provider-article-id tie-break, then budget
+    truncation. No wall-clock, no randomness, no LLM."""
+    ordered = sorted(items, key=lambda n: n.provider_article_id)
+    ordered.sort(key=lambda n: n.published_at, reverse=True)  # stable tie-break
+    seen: set[tuple[str | None, str]] = set()
+    unique: list[ContextNewsItem] = []
+    for n in ordered:
+        key = (n.provider, n.provider_article_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(n)
+    return unique[:MAX_NEWS]
+
+
 def build_fundamental_context(
     symbol: str,
     *,
@@ -109,13 +160,17 @@ def build_fundamental_context(
     valuation: ValuationSnapshot | None = None,
     documents: list[ResearchDocument] | None = None,
     news: list[ContextNewsItem] | None = None,
+    news_freshness: str | None = None,
     market_snapshot_summary: dict[str, Any] | None = None,
+    market_snapshot_generated_at: datetime | None = None,
     now: datetime | None = None,
 ) -> FundamentalResearchContext:
     """Assemble a bounded, deterministic research context.
 
     Ranking/filtering is fully deterministic (§12): no LLM involvement.
-    Missing inputs are recorded explicitly in `unavailable`.
+    `news_freshness` carries the M1 FreshnessState of the news feed
+    ("fresh"|"stale"|"missing"|"invalid") as evaluated upstream against the
+    same `now`. Missing inputs are recorded explicitly in `unavailable`.
     """
     now = now or datetime.now(UTC)
     unavailable: list[str] = []
@@ -207,7 +262,79 @@ def build_fundamental_context(
             FundamentalDataStatus(datatype="documents", symbol=symbol.upper(), state=DataQuality.OK)
         )
 
-    news_items = (news or [])[:MAX_NEWS]
+    # --- news: deterministic selection + explicit freshness semantics -----
+    news_items = _select_news(news or [])
+    if not news_items:
+        unavailable.append("news")
+        status.append(
+            FundamentalDataStatus(
+                datatype="news",
+                symbol=symbol.upper(),
+                state=DataQuality.UNAVAILABLE,
+                detail="no relevant articles available",
+            )
+        )
+    else:
+        feed_state = (news_freshness or "").strip().lower()
+        quality = _FRESHNESS_TO_QUALITY.get(feed_state)
+        if quality is None:
+            # Freshness was not evaluated upstream — say so explicitly
+            # instead of guessing (§33: no fabrication).
+            status.append(
+                FundamentalDataStatus(
+                    datatype="news",
+                    symbol=symbol.upper(),
+                    state=DataQuality.INCOMPLETE,
+                    detail="feed freshness not evaluated",
+                )
+            )
+        else:
+            if quality in {DataQuality.UNAVAILABLE, DataQuality.INVALID}:
+                unavailable.append("news")
+            status.append(
+                FundamentalDataStatus(
+                    datatype="news",
+                    symbol=symbol.upper(),
+                    state=quality,
+                    detail=f"feed freshness={feed_state}",
+                )
+            )
+
+    # --- market snapshot: bounded projection + explicit freshness ----------
+    summary = market_snapshot_summary or {}
+    if not summary:
+        unavailable.append("market_snapshot")
+        status.append(
+            FundamentalDataStatus(
+                datatype="market_snapshot",
+                symbol=symbol.upper(),
+                state=DataQuality.UNAVAILABLE,
+                detail="no market snapshot available",
+            )
+        )
+    else:
+        overall = str(summary.get("overall_state", "")).strip().lower()
+        quality = _FRESHNESS_TO_QUALITY.get(overall)
+        if quality is None:
+            status.append(
+                FundamentalDataStatus(
+                    datatype="market_snapshot",
+                    symbol=symbol.upper(),
+                    state=DataQuality.INCOMPLETE,
+                    detail="snapshot overall_state not reported",
+                )
+            )
+        else:
+            if quality in {DataQuality.UNAVAILABLE, DataQuality.INVALID}:
+                unavailable.append("market_snapshot")
+            status.append(
+                FundamentalDataStatus(
+                    datatype="market_snapshot",
+                    symbol=symbol.upper(),
+                    state=quality,
+                    detail=f"overall_state={overall}",
+                )
+            )
 
     ctx = FundamentalResearchContext(
         symbol=symbol.upper(),
@@ -218,7 +345,8 @@ def build_fundamental_context(
         valuation=valuation,
         documents=docs,
         news=news_items,
-        market_snapshot_summary=market_snapshot_summary or {},
+        market_snapshot_summary=summary,
+        market_snapshot_generated_at=market_snapshot_generated_at,
         data_status=status,
         unavailable=sorted(set(unavailable)),
         built_at=now,
@@ -231,12 +359,20 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
     """Render the context as a compact, structured prompt block.
 
     Facts only — no interpretation. Unavailable fields are explicitly
-    labeled so the model cannot mistake absence for zero.
+    labeled so the model cannot mistake absence for zero. Every section
+    renders even when its data is absent ("unavailable"), and blank lines
+    separate sections.
     """
     lines: list[str] = [
         f"COMPANY: {ctx.company_profile.name if ctx.company_profile else 'UNKNOWN'} ({ctx.symbol})",
         f"CONTEXT_VERSION: {ctx.context_version}  HASH: {ctx.context_hash}",
     ]
+
+    def section(header: str) -> None:
+        # Blank separator line, then the section header.
+        lines.append("")
+        lines.append(header)
+
     if ctx.company_profile:
         p = ctx.company_profile
         lines.append(
@@ -246,7 +382,7 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
         if p.description:
             lines.append(f"DESCRIPTION: {p.description}")
 
-    lines.append("\nFINANCIAL METRICS (deterministic source data; units as noted):")
+    section("FINANCIAL METRICS (deterministic source data; units as noted):")
     if not ctx.financial_metrics:
         lines.append("  unavailable")
     for m in ctx.financial_metrics:
@@ -263,14 +399,14 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
         )
 
     if ctx.derived_metrics:
-        lines.append("\nDERIVED METRICS (computed deterministically; formulas shown):")
+        section("DERIVED METRICS (computed deterministically; formulas shown):")
         for d in ctx.derived_metrics:
             lines.append(
                 f"  {d['metric']} = {d['value']:.6f}  formula: {d['formula']} "
                 f"inputs: {json.dumps(d['inputs'], sort_keys=True)}"
             )
 
-    lines.append("\nEARNINGS (surprises computed deterministically):")
+    section("EARNINGS (surprises computed deterministically):")
     if not ctx.earnings:
         lines.append("  unavailable")
     for e in ctx.earnings:
@@ -287,7 +423,7 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
         )
 
     v = ctx.valuation
-    lines.append("\nVALUATION:")
+    section("VALUATION:")
     if v is None:
         lines.append("  unavailable")
     else:
@@ -298,7 +434,7 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
             f"ev_ebitda={v.ev_ebitda or 'unavailable'} fcf_yield={v.fcf_yield or 'unavailable'}"
         )
 
-    lines.append("\nRESEARCH DOCUMENTS (only these documents exist for you):")
+    section("RESEARCH DOCUMENTS (only these documents exist for you):")
     if not ctx.documents:
         lines.append("  unavailable")
     for doc in ctx.documents:
@@ -309,22 +445,55 @@ def render_context_for_model(ctx: FundamentalResearchContext) -> str:
         if doc.content:
             lines.append(f"    content: {doc.content}")
 
-    if ctx.news:
-        lines.append("\nRECENT NEWS:")
-        for n in ctx.news:
-            lines.append(
-                f"  {n.published_at.date()} {n.headline} (source={n.source or 'unavailable'})"
-            )
-
-    if ctx.market_snapshot_summary:
+    section("RECENT NEWS (normalized feed; facts only — interpret, do not invent):")
+    news_status = next((s for s in ctx.data_status if s.datatype == "news"), None)
+    if news_status is not None and news_status.detail:
+        lines.append(f"  feed_state: {news_status.detail}")
+    if not ctx.news:
+        lines.append("  unavailable")
+    for n in ctx.news:
+        received = n.received_at.date() if n.received_at else "unavailable"
+        symbols = ",".join(n.symbols) if n.symbols else "unavailable"
         lines.append(
-            f"\nMARKET SNAPSHOT: {json.dumps(ctx.market_snapshot_summary, sort_keys=True)}"
+            f"  [{n.provider or 'unavailable'}:{n.provider_article_id}] "
+            f"{n.published_at.date()} {n.headline} "
+            f"(source={n.source or 'unavailable'}, symbols={symbols}, received={received})"
         )
+        if n.summary:
+            lines.append(f"    summary: {n.summary}")
+        if n.url:
+            lines.append(f"    url: {n.url}")
 
-    lines.append("\nDATA GAPS (explicitly unavailable — do NOT invent values for these):")
+    section("MARKET SNAPSHOT (point-in-time view; freshness states are authoritative):")
+    if not ctx.market_snapshot_summary:
+        lines.append("  unavailable")
+    else:
+        s = ctx.market_snapshot_summary
+        generated = (
+            ctx.market_snapshot_generated_at.isoformat()
+            if ctx.market_snapshot_generated_at
+            else "unavailable"
+        )
+        lines.append(
+            f"  overall_state={s.get('overall_state', 'unavailable')} generated_at={generated}"
+        )
+        for dq in s.get("data_quality", []):
+            as_of = dq.get("as_of") or "unavailable"
+            threshold = dq.get("threshold_seconds")
+            threshold_s = "unavailable" if threshold is None else f"{threshold:g}s"
+            detail = f" detail={dq['detail']}" if dq.get("detail") else ""
+            lines.append(
+                f"  {dq.get('datatype', '?')}: state={dq.get('state', 'unavailable')} "
+                f"as_of={as_of} threshold={threshold_s}{detail}"
+            )
+        market = s.get("market") or {}
+        if market:
+            lines.append(f"  market: {json.dumps(market, sort_keys=True)}")
+
+    section("DATA GAPS (explicitly unavailable — do NOT invent values for these):")
     lines.append(f"  {', '.join(ctx.unavailable) if ctx.unavailable else 'none'}")
 
-    return "\n".join(lines)
+    return chr(10).join(lines)
 
 
 __all__ = [

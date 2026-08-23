@@ -9,6 +9,8 @@ computed with configurable freshness thresholds.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
+from typing import Any
 
 from market_data.freshness import evaluate_freshness, load_thresholds_from_settings
 from market_data.schemas import (
@@ -46,8 +48,13 @@ def _news_schema(n) -> NewsArticle:
     )
 
 
-async def build_snapshot(session, symbol: str) -> MarketSnapshot:
-    """Assemble the snapshot for `symbol` from stored (normalized) data."""
+async def build_snapshot(session, symbol: str, *, now: datetime | None = None) -> MarketSnapshot:
+    """Assemble the snapshot for `symbol` from stored (normalized) data.
+
+    `now` lets callers pin the evaluation instant (e.g. the M2 research
+    context pins its own `now`) so freshness states stay mutually
+    consistent across the pipeline; defaults to wall clock.
+    """
     from app.db.repositories.market_data_repo import (
         BarRepository,
         NewsRepository,
@@ -57,7 +64,7 @@ async def build_snapshot(session, symbol: str) -> MarketSnapshot:
     )
 
     symbol = symbol.upper()
-    now = datetime.now(UTC)
+    now = now or datetime.now(UTC)
 
     security = await SecurityRepository(session).get_by_symbol(symbol)
     latest_bar = await BarRepository(session).get_latest_bar(symbol)
@@ -119,3 +126,81 @@ async def build_snapshot(session, symbol: str) -> MarketSnapshot:
         news=[_news_schema(n) for n in news],
         data_quality=data_quality,
     )
+
+
+# ---------------------------------------------------------------------------
+# M2 research-context projections (pure, deterministic; .clinerules §11/§12)
+# ---------------------------------------------------------------------------
+
+
+def _jsonable(value: Any) -> Any:
+    """Coerce runtime value types into JSON-stable primitives so the
+    projection survives canonical serialization + content hashing."""
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return float(value)
+    return value
+
+
+def snapshot_research_summary(snapshot: MarketSnapshot) -> dict[str, Any]:
+    """Deterministic, bounded projection of a snapshot for the M2 research
+    context.
+
+    Excludes wall-clock-volatile fields (`generated_at`, per-status
+    `age_seconds`): the context layer carries build time separately and
+    excludes it from the content hash, so identical underlying data yields
+    an identical summary. Discrete freshness STATES are retained verbatim
+    (fresh/stale/missing/invalid) — staleness is never hidden or upgraded.
+    Trade prints collapse to a count to respect the context budget.
+    """
+
+    def _block(block: dict[str, Any]) -> dict[str, Any]:
+        return {k: _jsonable(v) for k, v in block.items()}
+
+    market: dict[str, Any] = {}
+    for key, value in snapshot.market.items():
+        if key == "recent_trades":
+            market["recent_trades_count"] = len(value)
+        else:
+            market[key] = _block(value)
+
+    data_quality = [
+        {
+            "datatype": s.datatype,
+            "state": s.state.value,
+            "as_of": s.as_of.isoformat() if s.as_of else None,
+            "threshold_seconds": s.threshold_seconds,
+            "detail": s.detail,
+        }
+        for s in snapshot.data_quality
+    ]
+    return {
+        "symbol": snapshot.symbol,
+        "overall_state": snapshot.overall_state.value,
+        "data_quality": data_quality,
+        "market": market,
+    }
+
+
+def context_news_items(articles: list[NewsArticle]) -> list[dict[str, Any]]:
+    """Project normalized M1 news into M2 research-context dicts.
+
+    Full provenance preserved (provider, provider article id, source, url,
+    published/received timestamps, affected symbols). Pure — no LLM, no
+    reordering: the context builder owns deterministic ordering/budget.
+    """
+    return [
+        {
+            "provider_article_id": a.provider_article_id,
+            "headline": a.headline,
+            "summary": a.summary,
+            "source": a.source,
+            "url": a.url,
+            "symbols": list(a.symbols),
+            "published_at": a.published_at,
+            "received_at": a.received_at,
+            "provider": a.provider_info.provider,
+        }
+        for a in articles
+    ]

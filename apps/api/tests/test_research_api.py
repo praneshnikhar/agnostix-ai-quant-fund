@@ -200,20 +200,134 @@ class RecordingSession:
         return None
 
 
-@pytest.mark.anyio
-async def test_run_research_persists_lifecycle_events(monkeypatch) -> None:
-    """§24: research_requested/context_created/agent/critic/completed are
-    appended to agent_events via the DB sink."""
-    from app.db.repositories import fundamentals_repo as fr
-    from app.services import research_service as rs
+# ------------------------------------------------------- M2.1 market fakes
+
+
+def _news_row(i: int) -> _Rec:
+    return _Rec(
+        provider_article_id=f"n-{i}",
+        headline=f"Headline {i}",
+        summary=None,
+        source="Reuters",
+        url=None,
+        symbols=["ACME"],
+        published_at=T0 - timedelta(minutes=i),
+        received_at=T0 - timedelta(minutes=i),
+        provider="alpaca_news",
+    )
+
+
+def _market_repo_fakes(
+    monkeypatch,
+    *,
+    news_rows: list[_Rec] | None = None,
+    with_security: bool = True,
+    with_bar: bool = True,
+    with_quote: bool = True,
+    with_trades: bool = True,
+) -> dict:
+    """Fake the M1 market-data repositories so build_snapshot runs without
+    a database while exercising the REAL snapshot/projection logic.
+
+    Quote/trade timestamps are computed at call time: their freshness
+    thresholds (60s / 300s) are tighter than any fixed module constant can
+    guarantee, and the tests assert on stable OUTCOMES (fresh), not instants.
+    """
+    from app.db.repositories import market_data_repo as mdr
+
+    calls: dict = {"news_query": None}
+    sec = _Rec(name="Acme Corp", exchange="NASDAQ", asset_class="us_equity", status="active")
+    bar = _Rec(
+        symbol="ACME",
+        timeframe="1Day",
+        event_time=T0,
+        open=90.0,
+        high=92.0,
+        low=89.0,
+        close=91.20,
+        volume=1_000_000.0,
+        provider="alpaca_market_data",
+        received_at=T0,
+    )
+
+    class FakeSecurityRepo:
+        def __init__(self, *a) -> None:
+            pass
+
+        async def get_by_symbol(self, symbol):
+            return sec if (with_security and symbol == "ACME") else None
+
+    class FakeBarRepo:
+        def __init__(self, *a) -> None:
+            pass
+
+        async def get_latest_bar(self, symbol):
+            return bar if (with_bar and symbol == "ACME") else None
+
+    class FakeQuoteRepo:
+        def __init__(self, *a) -> None:
+            pass
+
+        async def get_latest_quote(self, symbol):
+            if not (with_quote and symbol == "ACME"):
+                return None
+            t = datetime.now(UTC) - timedelta(seconds=5)
+            return _Rec(
+                symbol=symbol,
+                event_time=t,
+                bid_price=91.0,
+                bid_size=100.0,
+                ask_price=91.4,
+                ask_size=100.0,
+                last_price=91.20,
+                provider="alpaca_market_data",
+                received_at=t,
+            )
+
+    class FakeTradeRepo:
+        def __init__(self, *a) -> None:
+            pass
+
+        async def get_recent_trades(self, symbol, limit=50):
+            if not (with_trades and symbol == "ACME"):
+                return []
+            t = datetime.now(UTC) - timedelta(seconds=10)
+            return [
+                _Rec(
+                    symbol=symbol,
+                    event_time=t,
+                    price=91.15,
+                    size=50.0,
+                    conditions=[],
+                    provider="alpaca_market_data",
+                    provider_trade_id="t-1",
+                    received_at=t,
+                )
+            ]
+
+    class FakeNewsRepo:
+        def __init__(self, *a) -> None:
+            pass
+
+        async def get_recent_news(self, symbols=None, limit=50, since=None):
+            calls["news_query"] = {"symbols": symbols, "limit": limit}
+            return list(news_rows or [])
+
+    monkeypatch.setattr(mdr, "SecurityRepository", FakeSecurityRepo)
+    monkeypatch.setattr(mdr, "BarRepository", FakeBarRepo)
+    monkeypatch.setattr(mdr, "QuoteRepository", FakeQuoteRepo)
+    monkeypatch.setattr(mdr, "TradeRepository", FakeTradeRepo)
+    monkeypatch.setattr(mdr, "NewsRepository", FakeNewsRepo)
+    return calls
+
+
+def _grounded_thesis_payload() -> dict:
+    """A thesis grounded in fixture facts — deterministic across runs."""
     from fundamentals.providers.fixture import FixtureFundamentalsProvider
     from fundamentals.research.schemas import InvestmentThesis
 
     fp = FixtureFundamentalsProvider()
-    # A grounded thesis built directly from context facts (deterministic):
-    # the first fixture metric is ACME annual revenue, present in any
-    # context run_research builds internally.
-    thesis_payload = InvestmentThesis.model_validate(
+    return InvestmentThesis.model_validate(
         {
             "symbol": "ACME",
             "research_timestamp": T0.isoformat(),
@@ -247,30 +361,46 @@ async def test_run_research_persists_lifecycle_events(monkeypatch) -> None:
         }
     ).model_dump(mode="json")
 
-    class FakeRun:
-        id = uuid.uuid4()
 
-    class FakeRuns:
-        def __init__(self, *a) -> None:
-            pass
+class _FakeRun:
+    id = uuid.uuid4()
 
-        async def create_run(self, symbol):
-            return FakeRun()
 
-        async def mark_running(self, rid):
-            return None
+class _FakeRuns:
+    def __init__(self, *a) -> None:
+        self.completed: dict = {}
 
-        async def complete_run(self, *a, **k):
-            return None
+    async def create_run(self, symbol):
+        return _FakeRun()
 
-        async def fail_run(self, *a):
-            return None
+    async def mark_running(self, rid):
+        return None
+
+    async def complete_run(self, run_id, **kwargs):
+        self.completed = kwargs
+        return None
+
+    async def fail_run(self, *a):
+        return None
+
+
+@pytest.mark.anyio
+async def test_run_research_persists_lifecycle_events(monkeypatch) -> None:
+    """§24: research_requested/context_created/agent/critic/completed are
+    appended to agent_events via the DB sink."""
+    from app.db.repositories import fundamentals_repo as fr
+    from app.services import research_service as rs
+
+    _market_repo_fakes(monkeypatch, news_rows=[_news_row(1)])
+
+    class FakeRuns(_FakeRuns):
+        pass
 
     monkeypatch.setattr(fr, "ResearchRunRepository", FakeRuns)
-    gw = _MockGateway(thesis_payload)
+    gw = _MockGateway(_grounded_thesis_payload())
     sess = RecordingSession()
     run_id = await rs.run_research(sess, "ACME", gateway=gw)  # type: ignore[arg-type]
-    assert run_id == FakeRun.id
+    assert run_id == _FakeRun.id
     types = [o.event_type for o in sess.added]
     assert "research_requested" in types
     assert "research_context_created" in types
@@ -278,10 +408,65 @@ async def test_run_research_persists_lifecycle_events(monkeypatch) -> None:
     assert "research_critic_started" in types
     assert "research_completed" in types
     research_events = [o for o in sess.added if o.event_type.startswith("research_")]
-    assert all(o.payload.get("run_id") == str(FakeRun.id) for o in research_events)
+    assert all(o.payload.get("run_id") == str(_FakeRun.id) for o in research_events)
     # Ordering: per-run seq is monotonically increasing in emission order.
     seqs = [o.payload["seq"] for o in research_events]
     assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
+
+
+@pytest.mark.anyio
+async def test_run_research_context_integrates_news_and_snapshot(monkeypatch) -> None:
+    """M2.1: the persisted context carries M1 news + snapshot status, and
+    news is queried for the requested symbol only."""
+    from app.db.repositories import fundamentals_repo as fr
+    from app.services import research_service as rs
+
+    fake_runs = _FakeRuns()
+    monkeypatch.setattr(fr, "ResearchRunRepository", lambda *a: fake_runs)
+    calls = _market_repo_fakes(monkeypatch, news_rows=[_news_row(1), _news_row(2)])
+
+    gw = _MockGateway(_grounded_thesis_payload())
+    await rs.run_research(RecordingSession(), "ACME", gateway=gw)  # type: ignore[arg-type]
+
+    payload = fake_runs.completed["context_payload"]
+    assert payload["context_version"] == "m2-v2"
+    types = {d["datatype"]: d["state"] for d in payload["data_status"]}
+    assert types["news"] == "ok"  # fresh feed -> ok
+    assert types["market_snapshot"] == "ok"
+    assert "news" not in payload["unavailable"]
+    assert "market_snapshot" not in payload["unavailable"]
+    # Relevance filter: news fetched for the requested symbol only.
+    assert calls["news_query"]["symbols"] == ["ACME"]
+
+
+@pytest.mark.anyio
+async def test_run_research_marks_missing_news_and_stale_market(monkeypatch) -> None:
+    """M2.1: absent news / stale market data become explicit gaps — never
+    fabricated, never silently omitted."""
+    from app.db.repositories import fundamentals_repo as fr
+    from app.services import research_service as rs
+
+    fake_runs = _FakeRuns()
+    monkeypatch.setattr(fr, "ResearchRunRepository", lambda *a: fake_runs)
+    # No news/security/bar/quote/trade rows -> every datatype missing.
+    _market_repo_fakes(
+        monkeypatch,
+        news_rows=[],
+        with_security=False,
+        with_bar=False,
+        with_quote=False,
+        with_trades=False,
+    )
+
+    gw = _MockGateway(_grounded_thesis_payload())
+    await rs.run_research(RecordingSession(), "ACME", gateway=gw)  # type: ignore[arg-type]
+
+    payload = fake_runs.completed["context_payload"]
+    types = {d["datatype"]: d["state"] for d in payload["data_status"]}
+    assert types["news"] == "unavailable"
+    assert types["market_snapshot"] == "unavailable"
+    assert "news" in payload["unavailable"]
+    assert "market_snapshot" in payload["unavailable"]
 
 
 def test_no_order_endpoints_in_research() -> None:

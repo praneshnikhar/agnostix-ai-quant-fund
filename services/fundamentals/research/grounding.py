@@ -111,6 +111,12 @@ def check_evidence_existence(
             known.add(e.event.provider_info.raw_record_id)
     if ctx.valuation and ctx.valuation.provider_info.raw_record_id:
         known.add(ctx.valuation.provider_info.raw_record_id)
+    # M2.1: normalized news is citable evidence — its provider article id
+    # and publisher source exist in the context by construction.
+    for n in ctx.news:
+        known.add(n.provider_article_id)
+        if n.source:
+            known.add(n.source)
 
     checks: list[ClaimCheck] = []
     for ev in thesis.evidence:

@@ -23,6 +23,14 @@
   optional LLM review can only escalate, never downgrade
 - Model evaluation harness (per-run records: provider/model/prompt
   version/latency/success/schema validity/critic verdict) + report summary
+- Research context integrates M1 market intelligence: normalized news
+  (full provenance: provider, article id, source, url, published/received
+  timestamps, symbols) with deterministic newest-first ordering, stable
+  tie-breaks, dedupe, and a bounded budget; plus a bounded MarketSnapshot
+  projection carrying discrete freshness states (fresh/stale/missing/
+  invalid) per datatype. Missing or stale inputs are reported as explicit
+  data gaps — never fabricated or silently omitted. Context version
+  bumped m2-v1 → m2-v2 because the hashed payload shape changed materially.
 - Research event persistence (research_requested → research_completed)
 - PostgreSQL migration 0003 (fundamental intelligence schema incl.
   research_runs and human-feedback foundation table)

@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agents.events import CorrelatedEmitter, EventSinkRegistry, RegistryEmitter
-from fundamentals.context import build_fundamental_context
+from fundamentals.context import ContextNewsItem, build_fundamental_context
 from fundamentals.metrics import earnings_surprise
 from fundamentals.providers.fixture import (
     FixtureDocumentsProvider,
@@ -33,6 +33,11 @@ from fundamentals.providers.fixture import (
 from fundamentals.research.agent import FundamentalResearchAgent
 from fundamentals.research.critic import CriticInput, FundamentalResearchCritic
 from fundamentals.schemas import EarningsResult
+from market_data.snapshot import (
+    build_snapshot,
+    context_news_items,
+    snapshot_research_summary,
+)
 
 
 async def _persist_event(session: AsyncSession, record) -> None:
@@ -57,11 +62,17 @@ async def _persist_event(session: AsyncSession, record) -> None:
     )
 
 
-def _build_context(symbol: str):
-    """Deterministic context from available providers.
+async def _build_context(
+    session: AsyncSession, symbol: str, *, now: datetime | None = None
+):
+    """Deterministic context from available providers + M1 market intel.
 
-    M2 data-source note: fixture providers back the development universe;
+    M2 data-source note: fixture providers back the fundamental universe;
     live fundamental providers land with a justified data subscription.
+    News + MarketSnapshot flow through the established M1 service layer
+    (build_snapshot) — never ad-hoc queries. When either is absent or
+    stale, the context records the gap explicitly; nothing is fabricated.
+    Zero LLM calls happen here (§12: deterministic assembly only).
     """
     fp = FixtureFundamentalsProvider()
     ep = FixtureEarningsProvider()
@@ -72,6 +83,10 @@ def _build_context(symbol: str):
     for e in ep.get_earnings_events(symbol):
         s, p = earnings_surprise(e.eps_actual, e.eps_estimate)
         earnings.append(EarningsResult(event=e, eps_surprise=s, eps_surprise_pct=p))
+
+    snapshot = await build_snapshot(session, symbol, now=now)
+    news_status = next((d for d in snapshot.data_quality if d.datatype == "news"), None)
+
     return build_fundamental_context(
         symbol.upper(),
         profile=fp.get_company_profile(symbol),
@@ -79,7 +94,13 @@ def _build_context(symbol: str):
         earnings=earnings,
         valuation=vp.get_valuation_snapshot(symbol),
         documents=dp.get_documents(symbol),
-        now=datetime.now(UTC),
+        news=[
+            ContextNewsItem.model_validate(d) for d in context_news_items(snapshot.news)
+        ],
+        news_freshness=news_status.state.value if news_status else None,
+        market_snapshot_summary=snapshot_research_summary(snapshot),
+        market_snapshot_generated_at=snapshot.generated_at,
+        now=now or datetime.now(UTC),
     )
 
 
@@ -114,7 +135,7 @@ async def run_research(
         )
 
     await _emit("research_requested", {})
-    ctx = _build_context(symbol)
+    ctx = await _build_context(session, symbol)
     await _emit("research_context_created", {"context_hash": ctx.context_hash})
     try:
         agent = FundamentalResearchAgent(gateway, emitter)
