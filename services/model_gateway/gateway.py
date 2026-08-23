@@ -128,6 +128,48 @@ def get_model_gateway(provider: str, *, model: str | None = None) -> ModelGatewa
     return ModelGateway(adapters=[adapter], routing_preference=[provider])
 
 
+def get_model_gateway_for_configuration(
+    provider: str,
+    *,
+    model: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    timeout_seconds: float | None = None,
+    extra_headers: dict[str, str] | None = None,
+) -> ModelGateway:
+    """Resolve a stored provider configuration through the same registry.
+
+    This is the configuration-aware seam for provider management. It does
+    not create a second registry and does not change the public gateway
+    contract used by agents.
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings().model_copy(
+        update={
+            "anthropic_api_key": api_key,
+            "openai_api_key": api_key,
+            "openrouter_api_key": api_key,
+            "ollama_base_url": base_url,
+            "custom_model_base_url": base_url,
+            "custom_model_api_key": api_key,
+            "ollama_timeout_seconds": timeout_seconds or get_settings().ollama_timeout_seconds,
+            "openrouter_timeout_seconds": timeout_seconds
+            or get_settings().openrouter_timeout_seconds,
+            "custom_model_timeout_seconds": timeout_seconds
+            or get_settings().custom_model_timeout_seconds,
+            "custom_model_headers": extra_headers or {},
+        }
+    )
+    builder = _ADAPTER_BUILDERS.get(provider)
+    if builder is None:
+        raise UnknownProviderError(f"unknown model provider {provider!r}")
+    return ModelGateway(
+        adapters=[builder(settings, model)],
+        routing_preference=[provider],
+    )
+
+
 class ModelGateway:
     """Provider-agnostic entry point for all model access."""
 

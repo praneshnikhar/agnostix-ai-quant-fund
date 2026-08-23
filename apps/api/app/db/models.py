@@ -78,6 +78,122 @@ class User(Base):
 
 
 # ---------------------------------------------------------------------------
+# provider management (M2.5)
+# ---------------------------------------------------------------------------
+
+
+class ProviderKind(enum.StrEnum):
+    AI = "ai"
+    DATA = "data"
+
+
+class ProviderScope(enum.StrEnum):
+    PLATFORM = "platform"
+    ORGANIZATION = "organization"
+    USER = "user"
+
+
+class ProviderConnectionStatus(enum.StrEnum):
+    UNKNOWN = "unknown"
+    CONNECTED = "connected"
+    TESTING = "testing"
+    FAILED = "failed"
+    TIMEOUT = "timeout"
+    UNAUTHORIZED = "unauthorized"
+    UNAVAILABLE = "unavailable"
+    NOT_CONFIGURED = "not_configured"
+
+
+class ProviderConfiguration(Base, TimestampMixin):
+    """Safe provider metadata plus encrypted server-side credentials.
+
+    ``secret_ciphertext`` is intentionally separate from ``metadata`` so
+    provider credentials cannot accidentally enter a normal JSON payload.
+    ``scope_id`` is nullable for the current platform scope; organization
+    scopes remain schema-ready but are not claimed as implemented.
+    """
+
+    __tablename__ = "provider_configurations"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    display_name: Mapped[str] = mapped_column(Text, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    scope: Mapped[str] = mapped_column(
+        String(16), default=ProviderScope.PLATFORM.value, nullable=False
+    )
+    scope_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    created_by: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    connection_status: Mapped[str] = mapped_column(
+        String(24), default=ProviderConnectionStatus.UNKNOWN.value, nullable=False
+    )
+    metadata_json: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
+    health_json: Mapped[dict | None] = mapped_column(JSONB)
+    secret_ciphertext: Mapped[str | None] = mapped_column(Text)
+    credential_version: Mapped[int] = mapped_column(default=1, nullable=False)
+
+    __table_args__ = (
+        Index(
+            "uq_provider_config_scope_identity",
+            "kind",
+            "scope",
+            "scope_id",
+            "provider",
+            unique=True,
+            postgresql_where=text("scope_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_provider_config_platform_identity",
+            "kind",
+            "scope",
+            "provider",
+            unique=True,
+            postgresql_where=text("scope_id IS NULL"),
+        ),
+        Index("ix_provider_config_kind_provider", "kind", "provider"),
+        Index("ix_provider_config_scope", "scope", "scope_id"),
+    )
+
+
+class ProviderModelConfiguration(Base, TimestampMixin):
+    """Configured model target attached to one AI provider configuration."""
+
+    __tablename__ = "provider_model_configurations"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    provider_configuration_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("provider_configurations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    model: Mapped[str] = mapped_column(Text, nullable=False)
+    display_name: Mapped[str | None] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    capabilities: Mapped[list | None] = mapped_column(JSONB)
+    context_window: Mapped[int | None]
+    source: Mapped[str] = mapped_column(String(24), default="configured", nullable=False)
+    available: Mapped[bool | None]
+    metadata_json: Mapped[dict | None] = mapped_column(JSONB)
+
+    __table_args__ = (
+        Index(
+            "uq_provider_model_target",
+            "provider_configuration_id",
+            "provider",
+            "model",
+            unique=True,
+        ),
+        Index("ix_provider_model_provider", "provider", "model"),
+    )
+
+
+# ---------------------------------------------------------------------------
 # proposals
 # ---------------------------------------------------------------------------
 
@@ -735,6 +851,11 @@ __all__ = [
     "MarketSnapshotRecord",
     "NewsArticleRecord",
     "Order",
+    "ProviderConfiguration",
+    "ProviderConnectionStatus",
+    "ProviderKind",
+    "ProviderModelConfiguration",
+    "ProviderScope",
     "PortfolioSnapshot",
     "Position",
     "Proposal",

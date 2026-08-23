@@ -96,3 +96,13 @@
 
 ### Security
 - Paper/IEX only; no order placement capability added.
+
+## M2.5 — Provider Management Backend
+
+- Added authenticated AI/data provider configuration CRUD with explicit scopes.
+- Added Fernet-encrypted provider credentials, masked safe responses, and
+  secret-free audit events.
+- Added safe connection testing, model discovery, default model persistence,
+  and canonical provider/model records through the existing ModelGateway seam.
+- Added Alpaca stored-credential injection into the existing M1 market-data and
+  news adapters without adding trading capability.

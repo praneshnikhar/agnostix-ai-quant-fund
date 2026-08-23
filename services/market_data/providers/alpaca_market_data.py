@@ -31,25 +31,41 @@ def _now() -> datetime:
 class AlpacaMarketDataProvider(MarketDataProvider):
     """client: an alpaca-py StockHistoricalClient-compatible object."""
 
-    def __init__(self, client: object | None = None) -> None:
+    def __init__(
+        self,
+        client: object | None = None,
+        *,
+        api_key: str | None = None,
+        secret_key: str | None = None,
+        feed: str | None = None,
+    ) -> None:
+        self._api_key = api_key
+        self._secret_key = secret_key
+        self._feed = feed
         if client is not None:
             self._client = client
         else:
-            self._client = self._build_default_client()
+            self._client = self._build_default_client(
+                api_key=self._api_key,
+                secret_key=self._secret_key,
+                feed=self._feed,
+            )
 
     @staticmethod
-    def _build_default_client() -> object:
+    def _build_default_client(
+        *, api_key: str | None = None, secret_key: str | None = None, feed: str | None = None
+    ) -> object:
         try:
             from alpaca.data.historical.stock import StockHistoricalDataClient
         except ImportError as exc:  # pragma: no cover - env-dependent
             raise ProviderError(
                 "alpaca-py is not installed; install it or inject a client"
             ) from exc
-        key = os.environ.get("ALPACA_API_KEY_ID")
-        secret = os.environ.get("ALPACA_API_SECRET_KEY")
+        key = api_key or os.environ.get("ALPACA_API_KEY_ID")
+        secret = secret_key or os.environ.get("ALPACA_API_SECRET_KEY")
         if not key or not secret:
             raise ProviderError("ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY not set")
-        feed = os.environ.get("ALPACA_DATA_FEED", "iex")  # iex = free paper feed
+        feed = feed or os.environ.get("ALPACA_DATA_FEED", "iex")  # iex = free paper feed
         # alpaca-py accepts the feed under different kwarg names across
         # versions; try both.
         kwargs: dict = {"api_key": key, "secret_key": secret}
@@ -95,7 +111,10 @@ class AlpacaMarketDataProvider(MarketDataProvider):
         received = _now()
         try:
             resp = self._client.get_stock_latest_quote(  # type: ignore[attr-defined]
-                {"symbols": [symbol.upper()], "feed": os.environ.get("ALPACA_DATA_FEED", "iex")}
+                {
+                    "symbols": [symbol.upper()],
+                    "feed": self._feed or os.environ.get("ALPACA_DATA_FEED", "iex"),
+                }
             )
         except Exception as exc:
             raise ProviderError(f"quote fetch failed for {symbol}: {exc}") from exc
@@ -141,8 +160,8 @@ class AlpacaMarketDataProvider(MarketDataProvider):
                 if client is None:
                     from alpaca.trading.client import TradingClient
 
-                    key = os.environ.get("ALPACA_API_KEY_ID")
-                    secret = os.environ.get("ALPACA_API_SECRET_KEY")
+                    key = self._api_key or os.environ.get("ALPACA_API_KEY_ID")
+                    secret = self._secret_key or os.environ.get("ALPACA_API_SECRET_KEY")
                     if not key or not secret:
                         raise ProviderError("credentials required for security metadata")
                     client = TradingClient(api_key=key, secret_key=secret, paper=True)
@@ -163,8 +182,9 @@ class AlpacaMarketDataProvider(MarketDataProvider):
 
     # -- helpers -------------------------------------------------------------
 
-    @staticmethod
-    def _request(symbol: str, timeframe: str, start: datetime, end: datetime, limit: int) -> dict:
+    def _request(
+        self, symbol: str, timeframe: str, start: datetime, end: datetime, limit: int
+    ) -> dict:
         tf_map = {"1Min": "1Min", "1Hour": "1Hour", "1Day": "1Day"}
         try:
             from typing import Any, cast
@@ -186,7 +206,7 @@ class AlpacaMarketDataProvider(MarketDataProvider):
                 start=start,
                 end=end,
                 limit=limit,
-                feed=cast(DataFeed | None, os.environ.get("ALPACA_DATA_FEED", "iex")),
+                feed=cast(DataFeed | None, self._feed or os.environ.get("ALPACA_DATA_FEED", "iex")),
             )
             return req  # type: ignore[return-value]
         except ImportError:

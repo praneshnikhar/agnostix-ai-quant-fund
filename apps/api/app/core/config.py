@@ -66,6 +66,10 @@ class Settings(BaseSettings):
 
     # --- Auth foundation ---
     auth_secret: str = "generate-a-long-random-string"
+    # Fernet key for provider credentials. Keep this outside the database and
+    # rotate through a deliberate credential-version migration, not by logging
+    # or returning it from the API.
+    provider_encryption_key: str | None = None
 
 
 @lru_cache

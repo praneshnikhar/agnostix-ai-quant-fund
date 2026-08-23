@@ -15,7 +15,15 @@ PROVIDER = "alpaca_news"
 class AlpacaNewsProvider(NewsProvider):
     """client: alpaca-py news-capable client (injectable for tests)."""
 
-    def __init__(self, client: object | None = None) -> None:
+    def __init__(
+        self,
+        client: object | None = None,
+        *,
+        api_key: str | None = None,
+        secret_key: str | None = None,
+    ) -> None:
+        self._api_key = api_key
+        self._secret_key = secret_key
         if client is not None:
             self._client = client
         else:
@@ -25,8 +33,8 @@ class AlpacaNewsProvider(NewsProvider):
                 raise ProviderError(
                     "alpaca-py is not installed; install it or inject a client"
                 ) from exc
-            key = os.environ.get("ALPACA_API_KEY_ID")
-            secret = os.environ.get("ALPACA_API_SECRET_KEY")
+            key = self._api_key or os.environ.get("ALPACA_API_KEY_ID")
+            secret = self._secret_key or os.environ.get("ALPACA_API_SECRET_KEY")
             if not key or not secret:
                 raise ProviderError("ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY not set")
             self._client = NewsClient(api_key=key, secret_key=secret)
