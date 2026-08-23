@@ -2,6 +2,20 @@
 ## [M2] Fundamental AI Intelligence
 
 ### Added
+- Provider-agnostic model platform (M2.3): a SINGLE provider registry in
+  the existing ModelGateway — get_model_gateway(provider, model) returns
+  the same normalized internal contract for every category. First-class
+  providers: openrouter (cloud aggregator; bounded retries on 429/5xx/
+  network only, explicit timeouts, JSON-mode structured output with schema
+  hint), ollama (local/offline; fully configurable host + explicit model
+  id — no hardcoded localhost/model/GPU), and custom (generic self-hosted /
+  OpenAI-compatible endpoints: vLLM/TGI/private/fine-tuned Agnostix models;
+  configurable base URL, optional bearer auth, extra headers). ModelResponse
+  now carries requested_model vs provider-served model id, finish_reason,
+  and benign provider_metadata; missing token/cost metadata stays None.
+  Domain layer (agent/critic/context/grounding/evaluation/services) has
+  ZERO provider imports — enforced by test. Evaluation CLI resolves any
+  registered provider via the registry (no provider-specific logic).
 - services/fundamentals: typed domain schemas (CompanyProfile,
   FinancialMetric, FinancialPeriod, statements, EarningsEvent/Result,
   ValuationSnapshot, FundamentalDataStatus, ResearchDocument)

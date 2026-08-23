@@ -73,27 +73,15 @@ def _parse_targets(pairs: list[str]):
 
 
 def _default_gateway_factory(target):
-    """Materialize a gateway pinned to one configured provider adapter."""
-    from app.core.config import get_settings
-    from model_gateway.gateway import ModelGateway
-    from model_gateway.providers.anthropic import AnthropicAdapter
-    from model_gateway.providers.ollama import OllamaAdapter
-    from model_gateway.providers.openai import OpenAIAdapter
+    """Resolve ANY registered provider through the SINGLE gateway registry.
 
-    settings = get_settings()
-    adapters = {
-        "anthropic": AnthropicAdapter(api_key=settings.anthropic_api_key),
-        "openai": OpenAIAdapter(api_key=settings.openai_api_key),
-        "ollama": OllamaAdapter(base_url=settings.ollama_base_url),
-    }
-    adapter = adapters.get(target.provider)
-    if adapter is None:
-        raise ValueError(
-            f"no gateway adapter for provider {target.provider!r}; available: {sorted(adapters)}"
-        )
-    if not adapter.is_configured:
-        raise ValueError(f"provider {target.provider!r} is not configured (missing credentials)")
-    return ModelGateway(adapters=[adapter], routing_preference=[target.provider])
+    Zero provider-specific logic lives here: openrouter / ollama / custom /
+    anthropic / openai all resolve identically via get_model_gateway, and an
+    unknown provider fails cleanly (isolated to this one target's record).
+    """
+    from model_gateway.gateway import get_model_gateway
+
+    return get_model_gateway(target.provider, model=target.model)
 
 
 def _warn_on_model_mismatch(records) -> None:

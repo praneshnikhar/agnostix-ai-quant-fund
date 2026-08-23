@@ -28,6 +28,8 @@ class ProviderName(StrEnum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     OLLAMA = "ollama"
+    OPENROUTER = "openrouter"
+    CUSTOM = "custom"  # generic self-hosted / OpenAI-compatible endpoints
 
 
 class Message(BaseModel):
@@ -56,11 +58,22 @@ class Usage(BaseModel):
 
 
 class ModelResponse(BaseModel):
+    """Normalized internal response — the ONLY shape agents ever see.
+
+    `model` is the provider-SERVED model id; `requested_model` records what
+    was asked for (may be an alias). Missing metadata stays None — never
+    fabricated. `provider_metadata` carries only benign, non-secret
+    diagnostics; credentials must never appear here.
+    """
+
     request_id: uuid.UUID
     provider: ProviderName
     model: str
+    requested_model: str | None = None
     content: str
     structured: dict[str, Any] | None = None
+    finish_reason: str | None = None
+    provider_metadata: dict[str, Any] | None = None
     usage: Usage = Field(default_factory=Usage)
     latency_ms: int
     success: bool = True

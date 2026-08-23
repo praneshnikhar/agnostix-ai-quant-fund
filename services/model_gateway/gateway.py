@@ -10,24 +10,39 @@ Usage:
         caller_agent_id="fundamental_agent_v1",
     )
 
-The gateway:
-- routes by model class + provider availability
-- records telemetry (provider, model, latency, tokens, cost, success)
-- never logs secrets
+Provider-agnostic by design (.clinerules §5): agents depend ONLY on this
+module and its normalized contracts — never on a provider SDK/adapter.
+Providers are resolved through a single REGISTRY (no second registry may be
+created); every category is first-class:
+
+    cloud      : anthropic / openai / openrouter
+    local      : ollama (works fully offline once models are downloaded)
+    custom     : any self-hosted / OpenAI-compatible HTTP endpoint
+
+Pinned single-provider gateways come from the same registry:
+
+    get_model_gateway(provider="openrouter", model="<id>")
+    get_model_gateway(provider="ollama",     model="<id>")
+    get_model_gateway(provider="custom",     model="<id>")
+
+Unknown providers fail cleanly with UnknownProviderError.
 """
 
 from __future__ import annotations
 
-import json
 import uuid
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from model_gateway.providers.anthropic import AnthropicAdapter
 from model_gateway.providers.base import (
     ProviderAdapter,
     ProviderNotConfiguredError,
 )
+from model_gateway.providers.custom import CustomModelAdapter
 from model_gateway.providers.ollama import OllamaAdapter
 from model_gateway.providers.openai import OpenAIAdapter
+from model_gateway.providers.openrouter import OpenRouterAdapter
 from model_gateway.schemas import (
     CallTelemetry,
     Message,
@@ -37,9 +52,80 @@ from model_gateway.schemas import (
     TelemetrySink,
 )
 
+if TYPE_CHECKING:
+    from app.core.config import Settings
+
 
 class NoProviderConfiguredError(RuntimeError):
     """Raised when no provider credentials are available for a call."""
+
+
+class UnknownProviderError(RuntimeError):
+    """Raised when an unknown provider name is requested from the registry."""
+
+
+# ---------------------------------------------------------------------------
+# Provider registry — the SINGLE source of provider construction.
+# Each builder receives (settings, explicit_model_override) and returns an
+# adapter. Adding a provider means adding ONE entry here; nothing else in
+# the codebase changes.
+# ---------------------------------------------------------------------------
+
+AdapterBuilder = Callable[["Settings", str | None], ProviderAdapter]
+
+_ADAPTER_BUILDERS: dict[str, AdapterBuilder] = {
+    "anthropic": lambda s, m: AnthropicAdapter(api_key=s.anthropic_api_key),
+    "openai": lambda s, m: OpenAIAdapter(api_key=s.openai_api_key),
+    "ollama": lambda s, m: OllamaAdapter(
+        base_url=s.ollama_base_url,
+        model=m or s.ollama_model,
+        timeout_seconds=s.ollama_timeout_seconds,
+    ),
+    "openrouter": lambda s, m: OpenRouterAdapter(
+        api_key=s.openrouter_api_key,
+        model=m or s.openrouter_model,
+        timeout_seconds=s.openrouter_timeout_seconds,
+        max_retries=s.openrouter_max_retries,
+        retry_backoff_seconds=s.openrouter_retry_backoff_seconds,
+    ),
+    "custom": lambda s, m: CustomModelAdapter(
+        base_url=s.custom_model_base_url,
+        api_key=s.custom_model_api_key,
+        model=m or s.custom_model_id,
+        timeout_seconds=s.custom_model_timeout_seconds,
+        extra_headers=dict(s.custom_model_headers or {}),
+    ),
+}
+
+# Default routing order; new providers append at the TAIL so existing
+# behavior is unchanged unless earlier providers are unconfigured.
+_DEFAULT_ROUTING = ["anthropic", "openai", "ollama", "openrouter", "custom"]
+
+
+def known_providers() -> list[str]:
+    """All provider names registered in the gateway."""
+    return sorted(_ADAPTER_BUILDERS)
+
+
+def _build_all_adapters(settings: Settings) -> list[ProviderAdapter]:
+    return [_ADAPTER_BUILDERS[name](settings, None) for name in _DEFAULT_ROUTING]
+
+
+def get_model_gateway(provider: str, *, model: str | None = None) -> ModelGateway:
+    """Return a gateway pinned to ONE registered provider (+ optional model).
+
+    The SAME internal ModelGateway contract is returned for every provider
+    category (cloud/local/custom). Unknown providers raise cleanly.
+    """
+    from app.core.config import get_settings  # local import avoids cycle
+
+    builder = _ADAPTER_BUILDERS.get(provider)
+    if builder is None:
+        raise UnknownProviderError(
+            f"unknown model provider {provider!r}; known providers: {known_providers()}"
+        )
+    adapter = builder(get_settings(), model)
+    return ModelGateway(adapters=[adapter], routing_preference=[provider])
 
 
 class ModelGateway:
@@ -54,24 +140,14 @@ class ModelGateway:
         self._adapters: dict[str, ProviderAdapter] = {a.name: a for a in (adapters or [])}
         self.telemetry = telemetry or TelemetrySink()
         # Preference order; first configured provider wins unless overridden.
-        self._routing_preference = routing_preference or [
-            "anthropic",
-            "openai",
-            "ollama",
-        ]
+        self._routing_preference = routing_preference or list(_DEFAULT_ROUTING)
 
     @classmethod
     def from_settings(cls) -> ModelGateway:
-        """Build a gateway from application settings."""
+        """Build a gateway from application settings (ALL registered providers)."""
         from app.core.config import get_settings  # local import avoids cycle
 
-        s = get_settings()
-        adapters: list[ProviderAdapter] = [
-            AnthropicAdapter(api_key=s.anthropic_api_key),
-            OpenAIAdapter(api_key=s.openai_api_key),
-            OllamaAdapter(base_url=s.ollama_base_url),
-        ]
-        return cls(adapters=adapters)
+        return cls(adapters=_build_all_adapters(get_settings()))
 
     def _select_adapter(self, model_class: ModelClass) -> ProviderAdapter:
         """Pick the first configured adapter per routing preference.
@@ -89,7 +165,8 @@ class ModelGateway:
                 return adapter
         raise NoProviderConfiguredError(
             f"No provider configured for model_class={model_class}. "
-            "Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or OLLAMA_BASE_URL."
+            "Set ANTHROPIC_API_KEY, OPENAI_API_KEY, OLLAMA_BASE_URL, "
+            "OPENROUTER_API_KEY, or CUSTOM_MODEL_BASE_URL."
         )
 
     async def run(
@@ -167,6 +244,8 @@ class ModelGateway:
         if not response.content:
             return None
         try:
+            import json
+
             return json.loads(response.content)
         except json.JSONDecodeError:
             return None
