@@ -83,3 +83,43 @@ class RegistryEmitter:
                 proposal_id=proposal_id,
             )
         )
+
+
+class CorrelatedEmitter:
+    """EventEmitter decorator that tags every event with a correlation id.
+
+    Orchestrators create one per logical run (e.g. a research run) and hand
+    it to the agents they drive. Agents keep emitting their own payloads;
+    the wrapper injects `run_id` (authoritative — overrides any value in the
+    inner payload) and a monotonically increasing `seq` so consumers can
+    reconstruct exact event order even though PostgreSQL's transaction-level
+    now() gives rows persisted in one transaction identical timestamps.
+    Satisfies the EventEmitter protocol; no global state; deterministic.
+    """
+
+    def __init__(
+        self,
+        inner: EventEmitter,
+        run_id: str,
+        *,
+        key: str = "run_id",
+    ) -> None:
+        self._inner = inner
+        self._run_id = run_id
+        self._key = key
+        self._seq = 0
+
+    async def emit(
+        self,
+        agent_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        proposal_id: uuid.UUID | None = None,
+    ) -> None:
+        self._seq += 1
+        await self._inner.emit(
+            agent_id=agent_id,
+            event_type=event_type,
+            payload={**payload, self._key: self._run_id, "seq": self._seq},
+            proposal_id=proposal_id,
+        )

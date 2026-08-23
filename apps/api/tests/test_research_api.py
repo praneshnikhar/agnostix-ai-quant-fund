@@ -172,6 +172,118 @@ async def test_feedback_validation(seeded) -> None:
     assert fb.decision == "APPROVE"
 
 
+class _MockGateway:
+    class ModelClass:
+        REASONING = "reasoning"
+
+    def __init__(self, payload: dict) -> None:
+        self._payload = payload
+
+    async def run(self, **kwargs):
+        return {
+            "content": None,
+            "structured": self._payload,
+            "provider": "mock",
+            "model": "mock-model-1",
+            "latency_ms": 5,
+        }
+
+
+class RecordingSession:
+    def __init__(self) -> None:
+        self.added: list = []
+
+    def add(self, obj) -> None:
+        self.added.append(obj)
+
+    async def commit(self) -> None:
+        return None
+
+
+@pytest.mark.anyio
+async def test_run_research_persists_lifecycle_events(monkeypatch) -> None:
+    """§24: research_requested/context_created/agent/critic/completed are
+    appended to agent_events via the DB sink."""
+    from app.db.repositories import fundamentals_repo as fr
+    from app.services import research_service as rs
+    from fundamentals.providers.fixture import FixtureFundamentalsProvider
+    from fundamentals.research.schemas import InvestmentThesis
+
+    fp = FixtureFundamentalsProvider()
+    # A grounded thesis built directly from context facts (deterministic):
+    # the first fixture metric is ACME annual revenue, present in any
+    # context run_research builds internally.
+    thesis_payload = InvestmentThesis.model_validate(
+        {
+            "symbol": "ACME",
+            "research_timestamp": T0.isoformat(),
+            "fundamental_view": "BULLISH",
+            "confidence": 0.6,
+            "investment_thesis": "Growth supported by reported revenue.",
+            "financial_assessment": {"area": "financial", "summary": "ok"},
+            "growth_assessment": {
+                "area": "growth",
+                "summary": "growing",
+                "statements": [
+                    {
+                        "kind": "FACT",
+                        "text": f"Revenue was {fp.get_financial_metrics('ACME')[0].value:,.1f}.",
+                        "evidence_ids": ["ev1"],
+                    }
+                ],
+            },
+            "profitability_assessment": {"area": "profitability", "summary": "ok"},
+            "cash_flow_assessment": {"area": "cash_flow", "summary": "ok"},
+            "balance_sheet_assessment": {"area": "balance_sheet", "summary": "ok"},
+            "valuation_assessment": {"area": "valuation", "summary": "ok"},
+            "evidence": [
+                {
+                    "evidence_id": "ev1",
+                    "source": "acme-fy2025-10k",
+                    "source_type": "document",
+                    "claim_supported": "growth",
+                }
+            ],
+        }
+    ).model_dump(mode="json")
+
+    class FakeRun:
+        id = uuid.uuid4()
+
+    class FakeRuns:
+        def __init__(self, *a) -> None:
+            pass
+
+        async def create_run(self, symbol):
+            return FakeRun()
+
+        async def mark_running(self, rid):
+            return None
+
+        async def complete_run(self, *a, **k):
+            return None
+
+        async def fail_run(self, *a):
+            return None
+
+    monkeypatch.setattr(fr, "ResearchRunRepository", FakeRuns)
+    gw = _MockGateway(thesis_payload)
+    sess = RecordingSession()
+    run_id = await rs.run_research(sess, "ACME", gateway=gw)  # type: ignore[arg-type]
+    assert run_id == FakeRun.id
+    types = [o.event_type for o in sess.added]
+    assert "research_requested" in types
+    assert "research_context_created" in types
+    assert "research_agent_started" in types
+    assert "research_critic_started" in types
+    assert "research_completed" in types
+    research_events = [o for o in sess.added if o.event_type.startswith("research_")]
+    assert all(o.payload.get("run_id") == str(FakeRun.id) for o in research_events)
+    # Ordering: per-run seq is monotonically increasing in emission order.
+    seqs = [o.payload["seq"] for o in research_events]
+    assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
+
+
 def test_no_order_endpoints_in_research() -> None:
     from app.main import create_app
 
