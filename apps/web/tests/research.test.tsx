@@ -95,6 +95,6 @@ describe("research symbol page", () => {
   it("renders unavailable metrics as unavailable — never fabricated", async () => {
     renderWithProviders(<ResearchSymbolPage params={{ symbol: "ACME" }} />);
     await screen.findByText("BULLISH");
-    expect(await screen.findByText("unavailable")).toBeTruthy();
+    expect((await screen.findAllByText("unavailable")).length).toBeGreaterThan(0);
   });
 });

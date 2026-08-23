@@ -107,6 +107,12 @@ export interface ResearchRun {
   prompt_version: string | null;
   model_provider: string | null;
   model_name: string | null;
+  model_requested?: string | null;
+  latency_ms?: number | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  total_tokens?: number | null;
+  estimated_cost_usd?: number | null;
   context_version: string | null;
   research_output: Thesis | null;
   critic_output: CriticOutput | null;
@@ -122,6 +128,22 @@ export interface HistoryEntry {
   model_provider: string | null;
   model_name: string | null;
   prompt_version: string | null;
+}
+
+export interface ResearchRunMetadata {
+  provider: string | null;
+  requestedModel: string | null;
+  servedModel: string | null;
+  agent: string | null;
+  agentVersion: string | null;
+  promptVersion: string | null;
+  contextVersion: string | null;
+  contextHash: string | null;
+  latencyMs: number | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  estimatedCostUsd: number | null;
 }
 
 export interface MetricDto {

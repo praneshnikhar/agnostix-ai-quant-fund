@@ -254,3 +254,13 @@ export function ModelBadge({ provider, model }: { provider?: string | null; mode
   if (!provider && !model) return <Badge>not connected</Badge>;
   return <Badge tone="info">{provider ?? "provider unavailable"}{model ? ` / ${model}` : ""}</Badge>;
 }
+
+export function DataQualityBadge({ state }: { state: string | null | undefined }) {
+  const normalized = (state ?? "unavailable").toLowerCase();
+  const tone = normalized === "fresh" || normalized === "ok" ? "positive" : normalized === "stale" || normalized === "incomplete" ? "warning" : normalized === "invalid" ? "negative" : "neutral";
+  return <Badge tone={tone}>{normalized === "unavailable" ? "not connected" : normalized}</Badge>;
+}
+
+export function EvidenceItem({ id, source, sourceType, claim, period, href }: { id: string; source: string; sourceType: string; claim: string; period?: string | null; href?: string | null }) {
+  return <li className="border-b border-border/50 px-3 py-3 last:border-0"><div className="flex flex-wrap items-center gap-2 text-xs"><span className="font-mono text-accent">{id}</span><span className="text-subtle">{sourceType}</span><span className="text-foreground">{source}</span>{period ? <span className="text-2xs text-subtle">{period}</span> : null}{href ? <a href={href} target="_blank" rel="noreferrer" className="text-2xs text-accent hover:underline">source ↗</a> : null}</div><p className="mt-1 text-xs leading-relaxed text-muted">{claim}</p></li>;
+}
