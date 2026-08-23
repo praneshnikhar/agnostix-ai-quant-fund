@@ -5,32 +5,28 @@ import { usePathname } from "next/navigation";
 import {
   Activity,
   Bot,
-  Brain,
-  FileSearch,
-  Gavel,
   LayoutDashboard,
   LineChart,
   Newspaper,
-  Settings,
-  Shield,
-  Signal,
+  Boxes,
   Wallet,
+  Shield,
+  GitBranch,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUiStore } from "@/store/ui-store";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Command Center", icon: LayoutDashboard },
   { href: "/markets", label: "Markets", icon: LineChart },
   { href: "/research", label: "Research", icon: Newspaper },
   { href: "/agents", label: "Agents", icon: Bot },
-  { href: "/signals", label: "Signals", icon: Signal },
-  { href: "/committee", label: "Committee", icon: Gavel },
+  { href: "/models", label: "Models", icon: Boxes },
   { href: "/portfolio", label: "Portfolio", icon: Wallet },
   { href: "/risk", label: "Risk", icon: Shield },
-  { href: "/trading", label: "Trading", icon: Activity },
-  { href: "/learning", label: "Learning", icon: Brain },
-  { href: "/audit", label: "Audit", icon: FileSearch },
+  { href: "/signals", label: "Decisions", icon: GitBranch },
+  { href: "/audit", label: "System", icon: Settings },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -48,8 +44,8 @@ export function Sidebar() {
     >
       <div className="flex h-11 items-center justify-between border-b border-border px-3">
         {!collapsed && (
-          <span className="text-xs font-semibold tracking-widest text-foreground">
-            AI FUND
+          <span className="text-xs font-semibold tracking-[0.2em] text-foreground">
+            AGNOSTIX
           </span>
         )}
         <button

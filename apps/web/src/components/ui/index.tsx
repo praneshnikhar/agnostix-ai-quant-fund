@@ -218,3 +218,39 @@ export function EmptyState({
     </div>
   );
 }
+
+export function SectionHeader({ eyebrow, title, description, actions }: { eyebrow?: string; title: string; description?: string; actions?: React.ReactNode }) {
+  return <div className="flex flex-wrap items-end justify-between gap-3">
+    <div>
+      {eyebrow ? <p className="text-2xs uppercase tracking-[0.18em] text-accent">{eyebrow}</p> : null}
+      <h1 className="mt-1 text-lg font-semibold tracking-tight text-foreground">{title}</h1>
+      {description ? <p className="mt-1 max-w-2xl text-xs text-muted">{description}</p> : null}
+    </div>
+    {actions}
+  </div>;
+}
+
+export function ErrorState({ title = "Unable to load data", description }: { title?: string; description?: string }) {
+  return <div role="alert" className="flex flex-col items-center justify-center gap-1 px-6 py-12 text-center">
+    <p className="text-sm font-medium text-negative">{title}</p>
+    <p className="max-w-md text-xs text-muted">{description ?? "The service may be unavailable. Try again when the backend is reachable."}</p>
+  </div>;
+}
+
+export function LoadingState({ label = "Loading data…" }: { label?: string }) {
+  return <div role="status" className="space-y-3 px-4 py-5">
+    <Skeleton className="h-3 w-32" />
+    <Skeleton className="h-3 w-2/3" />
+    <p className="text-2xs text-subtle">{label}</p>
+  </div>;
+}
+
+export function ConfidenceIndicator({ value }: { value: number | null | undefined }) {
+  if (value == null) return <span className="text-subtle">unavailable</span>;
+  return <span className="tnum text-muted">{(value * 100).toFixed(0)}%</span>;
+}
+
+export function ModelBadge({ provider, model }: { provider?: string | null; model?: string | null }) {
+  if (!provider && !model) return <Badge>not connected</Badge>;
+  return <Badge tone="info">{provider ?? "provider unavailable"}{model ? ` / ${model}` : ""}</Badge>;
+}

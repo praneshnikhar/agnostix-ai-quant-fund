@@ -1,0 +1,5 @@
+import { EmptyState, Panel, PanelHeader, SectionHeader } from "@/components/ui";
+
+export default function ModelsPage() {
+  return <div className="space-y-5"><SectionHeader eyebrow="MODEL PLATFORM" title="Models" description="Provider-agnostic registry and evaluation workspace. No provider is treated as the permanent Agnostix model." /><div className="grid gap-3 xl:grid-cols-3"><Panel><PanelHeader title="Model registry" /><EmptyState title="No registry endpoint" description="Provider, model, version, and context metadata will appear here when the API exposes the registry." /></Panel><Panel><PanelHeader title="Evaluation runs" /><EmptyState title="No evaluation data" description="Latency, tokens, cost, grounding, and critic results are not available from the current API." /></Panel><Panel><PanelHeader title="Comparison" /><EmptyState title="Comparison unavailable" description="OpenRouter, Ollama, custom, and direct provider comparisons will be enabled by evaluation contracts." /></Panel></div></div>;
+}

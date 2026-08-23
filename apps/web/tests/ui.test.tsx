@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { Badge, EmptyState, StatusDot } from "@/components/ui";
+import { Badge, EmptyState, ErrorState, LoadingState, ModelBadge, StatusDot } from "@/components/ui";
 
 describe("design-system primitives", () => {
   it("renders a badge with tone styling", () => {
@@ -21,5 +21,16 @@ describe("design-system primitives", () => {
     );
     expect(screen.getByText("No data")).toBeTruthy();
     expect(screen.getByText(/Awaiting first milestone/)).toBeTruthy();
+  });
+
+  it("renders explicit loading and error states", () => {
+    render(<><LoadingState label="Loading market data" /><ErrorState description="Market API unavailable" /></>);
+    expect(screen.getByText("Loading market data")).toBeTruthy();
+    expect(screen.getByRole("alert").textContent).toContain("Market API unavailable");
+  });
+
+  it("does not fabricate model metadata", () => {
+    render(<ModelBadge />);
+    expect(screen.getByText("not connected")).toBeTruthy();
   });
 });

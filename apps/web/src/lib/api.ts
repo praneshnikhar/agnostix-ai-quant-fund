@@ -17,3 +17,16 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 export function getHealth(): Promise<HealthResponse> {
   return apiFetch<HealthResponse>("/health");
 }
+
+export interface AgentEvent {
+  id: string;
+  timestamp: string;
+  agent_id: string;
+  event_type: string;
+  payload: Record<string, unknown>;
+  proposal_id: string | null;
+}
+
+export function getAgentEvents(limit = 20): Promise<AgentEvent[]> {
+  return apiFetch<AgentEvent[]>(`/agent-events?limit=${limit}`);
+}
