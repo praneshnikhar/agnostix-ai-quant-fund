@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -43,7 +44,12 @@ Respond with a single JSON object matching the requested schema."""
 
 
 class AgentRunResult(BaseModel):
-    """Agent output + full reproducibility metadata (§23)."""
+    """Agent output + full reproducibility metadata (§23).
+
+    Token/cost fields are populated ONLY when the gateway response reports
+    them; None means the provider did not supply that metric — never
+    fabricated (.clinerules §33).
+    """
 
     thesis: InvestmentThesis
     provider: str
@@ -54,6 +60,10 @@ class AgentRunResult(BaseModel):
     context_version: str
     context_hash: str
     latency_ms: int
+    input_tokens: int | None = None
+    output_tokens: int | None = None
+    total_tokens: int | None = None
+    estimated_cost_usd: float | None = None
 
 
 def _response_schema() -> dict:
@@ -140,6 +150,11 @@ class FundamentalResearchAgent(ResearchAgent):
             if isinstance(response, dict)
             else getattr(response, "latency_ms", 0)
         )
+        usage = (
+            response.get("usage")
+            if isinstance(response, dict)
+            else getattr(response, "usage", None)
+        )
         structured = (
             response.get("structured")
             if isinstance(response, dict)
@@ -177,6 +192,10 @@ class FundamentalResearchAgent(ResearchAgent):
             context_version=ctx.context_version,
             context_hash=ctx.context_hash,
             latency_ms=int(latency or 0),
+            input_tokens=_usage_int(usage, "prompt_tokens"),
+            output_tokens=_usage_int(usage, "completion_tokens"),
+            total_tokens=_usage_int(usage, "total_tokens"),
+            estimated_cost_usd=_usage_float(usage, "estimated_cost_usd"),
         )
         await self.emitter.emit(
             agent_id=self.qualified_id,
@@ -190,6 +209,26 @@ class FundamentalResearchAgent(ResearchAgent):
             },
         )
         return result
+
+
+def _usage_value(usage: Any, key: str) -> Any:
+    """Read one field off a gateway usage object (dict or attr based).
+    Missing/unshaped metadata stays None — unavailable, not zero."""
+    if usage is None:
+        return None
+    return usage.get(key) if isinstance(usage, dict) else getattr(usage, key, None)
+
+
+def _usage_int(usage: Any, key: str) -> int | None:
+    value = _usage_value(usage, key)
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _usage_float(usage: Any, key: str) -> float | None:
+    value = _usage_value(usage, key)
+    if isinstance(value, bool):
+        return None
+    return value if isinstance(value, (int, float)) else None
 
 
 def _parse_json(text: str | None) -> dict | None:

@@ -31,6 +31,27 @@
   invalid) per datatype. Missing or stale inputs are reported as explicit
   data gaps — never fabricated or silently omitted. Context version
   bumped m2-v1 → m2-v2 because the hashed payload shape changed materially.
+- Operational multi-model evaluation runner (M2.2): ONE immutable research
+  context is built exactly once per run; every configured provider/model
+  target is evaluated against that identical context (same context version
+  + hash, prompt version, facts, news, snapshot, documents), followed by
+  deterministic grounding + critic per model. Identical-context invariant
+  fails the whole run rather than comparing different contexts; per-model
+  failures are isolated (status=failed + structured error, no fabricated
+  output); ordering follows configuration order deterministically. Metrics:
+  provider/model/served model_version, prompt+agent versions, latency,
+  input/output/total tokens, estimated cost (None when a provider does not
+  report it — never fabricated), schema validity, critic verdict,
+  grounding result, evidence coverage, data-quality gaps.
+- evaluation_runs table (migration 0004) + repository: one row per
+  multi-model evaluation over a single context, storing reproduction
+  metadata (context version/hash, prompt/agent versions, ordered model
+  config) and the full ordered report as JSONB; correlated audit events
+  (evaluation_requested/context_created/model_finished/completed|failed)
+- CLI entry point: python -m infra.scripts.evaluate_models --symbol ACME
+  --model PROVIDER:MODEL [--model ...] [--dry-run]; providers resolve via
+  existing Model Gateway adapters (extensible; unknown/unconfigured
+  providers fail only their own record)
 - Research event persistence (research_requested → research_completed)
 - PostgreSQL migration 0003 (fundamental intelligence schema incl.
   research_runs and human-feedback foundation table)

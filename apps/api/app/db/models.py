@@ -672,11 +672,62 @@ class ResearchFeedback(Base):
     )
 
 
+# ---------------------------------------------------------------------------
+# M2.2 — operational model evaluation
+# ---------------------------------------------------------------------------
+
+
+class EvaluationRunStatus(enum.StrEnum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class EvaluationRun(Base):
+    """One multi-model evaluation over a SINGLE research context (M2.2).
+
+    Reproduction metadata (context version + hash, prompt/agent versions,
+    ordered model configuration) is first-class; the full ordered report
+    (per-model records incl. tokens/cost/verdict/grounding) is stored as
+    JSONB. NOT a duplicate of research_runs: a research run produces ONE
+    thesis; an evaluation run compares N models over one shared context.
+    """
+
+    __tablename__ = "evaluation_runs"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16), default=EvaluationRunStatus.PENDING.value, index=True
+    )
+
+    # reproducibility metadata (§23)
+    context_version: Mapped[str] = mapped_column(Text, nullable=False)
+    context_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_version: Mapped[str | None] = mapped_column(Text)
+    agent_id: Mapped[str | None] = mapped_column(Text)
+    agent_version: Mapped[str | None] = mapped_column(Text)
+    models_config: Mapped[list | None] = mapped_column(JSONB)
+
+    # outcome
+    report: Mapped[dict | None] = mapped_column(JSONB)
+    error: Mapped[str | None] = mapped_column(Text)
+
+    __table_args__ = (Index("ix_evaluation_runs_symbol_created", "symbol", "created_at"),)
+
+
 __all__ = [
     "AgentEvent",
     "Base",
     "CriticReview",
     "EarningsEventRecord",
+    "EvaluationRun",
+    "EvaluationRunStatus",
     "FinancialMetricRecord",
     "FinancialStatementRecord",
     "HumanDecision",

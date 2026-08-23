@@ -15,6 +15,8 @@ domain schemas' identity constraints:
                         (first-write-wins).
 - research_runs       : lifecycle rows; created pending → completed/failed.
 - research_feedback   : append-only inserts.
+- evaluation_runs     : one multi-model evaluation over ONE context;
+                        created pending → running → completed/failed.
 """
 
 from __future__ import annotations
@@ -29,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import (
     CompanyProfileRecord,
     EarningsEventRecord,
+    EvaluationRun,
     FinancialMetricRecord,
     FinancialStatementRecord,
     ResearchDocumentRecord,
@@ -288,6 +291,85 @@ class ResearchRunRepository:
             select(ResearchRun)
             .where(ResearchRun.symbol == symbol.upper())
             .order_by(ResearchRun.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars())
+
+
+class EvaluationRunRepository:
+    """Lifecycle storage for multi-model evaluation runs (M2.2)."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def create_run(
+        self, symbol: str, *, context_version: str, context_hash: str, models_config: list[dict]
+    ) -> EvaluationRun:
+        run = EvaluationRun(
+            symbol=symbol.upper(),
+            context_version=context_version,
+            context_hash=context_hash,
+            models_config=models_config,
+        )
+        self._session.add(run)
+        await self._session.flush()
+        return run
+
+    async def mark_running(self, run_id: uuid.UUID) -> None:
+        run = await self.get_run(run_id)
+        if run is not None:
+            run.status = "running"
+
+    async def complete_run(
+        self,
+        run_id: uuid.UUID,
+        *,
+        report: dict,
+        prompt_version: str | None = None,
+        agent_id: str | None = None,
+        agent_version: str | None = None,
+    ) -> None:
+        run = await self.get_run(run_id)
+        if run is None:
+            return
+        run.status = "completed"
+        run.completed_at = datetime.now(run.created_at.tzinfo) if run.created_at else None
+        run.report = report
+        run.prompt_version = prompt_version
+        run.agent_id = agent_id
+        run.agent_version = agent_version
+
+    async def fail_run(self, run_id: uuid.UUID, error: str) -> None:
+        run = await self.get_run(run_id)
+        if run is None:
+            return
+        run.status = "failed"
+        run.completed_at = datetime.now(run.created_at.tzinfo) if run.created_at else None
+        run.error = error[:2000]
+
+    async def get_run(self, run_id: uuid.UUID) -> EvaluationRun | None:
+        result = await self._session.execute(
+            select(EvaluationRun).where(EvaluationRun.id == run_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_latest_completed(self, symbol: str) -> EvaluationRun | None:
+        result = await self._session.execute(
+            select(EvaluationRun)
+            .where(
+                EvaluationRun.symbol == symbol.upper(),
+                EvaluationRun.status == "completed",
+            )
+            .order_by(EvaluationRun.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_history(self, symbol: str, limit: int = 50) -> list[EvaluationRun]:
+        result = await self._session.execute(
+            select(EvaluationRun)
+            .where(EvaluationRun.symbol == symbol.upper())
+            .order_by(EvaluationRun.created_at.desc())
             .limit(limit)
         )
         return list(result.scalars())
