@@ -85,52 +85,101 @@ The agent pipeline enforces a fixed execution chain — `Signal → Critic → R
 | Quality | Ruff (+ bandit rules), mypy, pytest, Vitest, Testing Library |
 | Infra | Docker Compose, GitHub Actions CI |
 
-## Quickstart
+## Quickstart (Docker)
 
 Prerequisites: Docker, Python 3.12, Node 20.
 
 ```bash
 git clone <repo-url> && cd agnostix-ai-quant-fund
 
-cp .env.example .env          # add your Alpaca + LLM provider keys
-make dev                      # docker compose up --build
+cp .env.example .env          # then edit .env and add your keys (below)
+make dev                      # docker compose up --build (postgres, redis, api, worker, web)
+```
+
+In a second terminal, apply migrations + seed:
+
+```bash
+make migrate                  # alembic upgrade head
+make seed
 ```
 
 | Service | URL |
 |---|---|
 | Web frontend | http://localhost:3000 |
+| Trading War Room | http://localhost:3000/trading |
+| Interactive Playground | http://localhost:3000/playground |
 | API | http://localhost:8000 |
 | API docs | http://localhost:8000/docs |
 
-Run without Docker:
+### Run without Docker
 
 ```bash
+python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-make migrate                  # alembic upgrade head
-uvicorn app.main:app --reload --app-dir apps/api
-cd apps/web && npm install && npm run dev
+cp .env.example .env          # add keys
+docker compose up -d postgres redis   # you still need the data stores
+make migrate
+make seed
+uvicorn app.main:app --reload --app-dir apps/api --port 8000   # terminal 1
+cd apps/web && npm install && npm run dev                      # terminal 2
 ```
+
+### Smoke test
+
+```bash
+curl -s http://localhost:8000/health
+curl -s http://localhost:8000/trading/status
+python -m infra.scripts.agnostix status      # desk status via CLI
+```
+
+## Configuration
+
+All config flows through environment variables (see `.env.example`). **The API reads every setting with the `API_` prefix** (`app/core/config.py` uses `env_prefix="API_"`) — plain `ALPACA_API_KEY` or `OPENROUTER_API_KEY` are ignored.
+
+The minimum working `.env`:
+
+```bash
+# LLM — OpenRouter free tier works (use any ":free" model id)
+API_OPENROUTER_API_KEY=sk-or-v1-...
+API_OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
+# ...or any one of: API_OPENAI_API_KEY / API_ANTHROPIC_API_KEY / API_OLLAMA_BASE_URL
+
+# Alpaca — PAPER TRADING ONLY (fresh $100k paper account)
+API_ALPACA_API_KEY=<paper key id>
+API_ALPACA_SECRET_KEY=<paper secret>
+API_ALPACA_PAPER=true
+```
+
+| Group | Variables |
+|---|---|
+| Database / Redis | `API_DATABASE_URL`, `API_REDIS_URL` |
+| Alpaca (paper) | `API_ALPACA_API_KEY`, `API_ALPACA_SECRET_KEY`, `API_ALPACA_PAPER=true`, `API_ALPACA_MCP_URL` *(server-side only, never exposed to the frontend)* |
+| Model Gateway | `API_OPENROUTER_API_KEY` + `API_OPENROUTER_MODEL`, `API_OPENAI_API_KEY`, `API_ANTHROPIC_API_KEY`, `API_OLLAMA_BASE_URL` — gateway uses whichever is set |
+| Security | `AUTH_SECRET`, `API_PROVIDER_ENCRYPTION_KEY` (Fernet key for provider credentials at rest) |
 
 ## Common Commands
 
 ```bash
 make dev         # start full stack (postgres, redis, api, worker, web)
+make migrate     # apply DB migrations
+make seed        # seed database
 make test        # pytest (unit + integration layout)
 make lint        # ruff check + mypy
 make format      # ruff format + autofix
 make typecheck   # TypeScript, apps/web
-make migrate     # apply DB migrations
-make seed        # seed database
 ```
 
-## Configuration
+### Trading desk CLI
 
-All config flows through environment variables (see `.env.example`). Key groups:
-
-- **Database / Redis** — `API_DATABASE_URL`, `API_REDIS_URL`
-- **Alpaca** — `ALPACA_API_KEY`, `ALPACA_SECRET_KEY`, `ALPACA_PAPER=true` *(server-side only, never exposed to the frontend)*
-- **Model Gateway** — any of `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_BASE_URL`; the gateway works with whichever is set
-- **Security** — `AUTH_SECRET`, `API_PROVIDER_ENCRYPTION_KEY` (Fernet key used to encrypt provider credentials at rest)
+```bash
+python -m infra.scripts.agnostix status            # desk status + account
+python -m infra.scripts.agnostix chain SPY         # enriched option chain
+python -m infra.scripts.agnostix decide AAPL       # one decision (dry-run)
+python -m infra.scripts.agnostix decide AAPL --execute   # place a paper order
+python -m infra.scripts.agnostix run SPY AAPL      # run a cycle
+python -m infra.scripts.agnostix journal --verify  # verify the hash-chained ledger
+python -m infra.scripts.agnostix kill              # engage the kill switch
+```
 
 ## Roadmap
 
@@ -151,5 +200,5 @@ All config flows through environment variables (see `.env.example`). Key groups:
 2. **Conflicts preserved, never silently corrected** — validation flags quality issues instead of mutating data
 3. **Deterministic checks outrank LLM opinions** — grounding and risk logic are rule-based; LLM reviewers can escalate but never downgrade a verdict
 4. **Human-in-the-loop by architecture** — the LangGraph interrupt point makes approval structurally unavoidable
-5. **No live capital** — paper trading only; order placement exists as a reserved permission until M7
+5. **No live capital** — paper trading only; `ALPACA_PAPER=false` is hard-refused at adapter construction
 6. **Lean dependencies** — ML/RL libraries (PyTorch, XGBoost, vectorbt…) join only when their milestone begins
