@@ -472,7 +472,7 @@ async def test_run_research_marks_missing_news_and_stale_market(monkeypatch) -> 
 def test_no_order_endpoints_in_research() -> None:
     from app.main import create_app
 
-    paths = {getattr(rt, "path", "") for rt in create_app().routes}
+    paths = list(create_app().openapi()["paths"].keys())
     research_paths = [p for p in paths if p.startswith("/research")]
     assert research_paths
     for p in research_paths:

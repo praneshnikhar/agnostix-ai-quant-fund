@@ -80,11 +80,15 @@ class AlpacaBroker(Broker):
         import asyncio
 
         account = await asyncio.to_thread(self._trading.get_account)
+        last_equity = getattr(account, "last_equity", None)
         return AccountInfo(
             equity=float(account.equity),
             cash=float(account.cash),
             buying_power=float(account.buying_power),
-            raw={"account_number": str(getattr(account, "account_number", ""))},
+            raw={
+                "account_number": str(getattr(account, "account_number", "")),
+                "last_equity": float(last_equity) if last_equity is not None else None,
+            },
         )
 
     async def get_positions(self) -> list[PositionInfo]:

@@ -10,6 +10,8 @@ const PRIMARY_NAV = [
   { href: "/", label: "Command Center", icon: LayoutDashboard },
   { href: "/markets", label: "Markets", icon: LineChart },
   { href: "/research", label: "Research", icon: Newspaper },
+  { href: "/trading", label: "Trading Desk", icon: Wallet },
+  { href: "/playground", label: "Playground", icon: Activity },
   { href: "/agents", label: "AI / Agents", icon: Bot },
   { href: "/models", label: "Models", icon: Boxes },
   { href: "/portfolio", label: "Portfolio", icon: Wallet },

@@ -26,6 +26,9 @@ ignore = [
 "services/market_data/tests/**" = ["S101"]
 "services/fundamentals/tests/**" = ["S101"]
 "services/model_gateway/tests/**" = ["S101"]
+"services/options/tests/**" = ["S101"]
+"services/risk/tests/**" = ["S101"]
+"services/trading/tests/**" = ["S101", "S311"]
 "apps/api/tests/**" = ["S101"]
 # S101: workers use asserts as internal invariants on ingestion pipelines.
 "apps/api/app/workers/**" = ["S101"]
@@ -57,6 +60,9 @@ testpaths = [
     "services/market_data/tests",
     "services/fundamentals/tests",
     "services/model_gateway/tests",
+    "services/options/tests",
+    "services/risk/tests",
+    "services/trading/tests",
 ]
 markers = [
     "integration: tests requiring live infrastructure (deselect with '-m \"not integration\"')",

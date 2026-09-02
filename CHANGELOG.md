@@ -1,4 +1,36 @@
 
+## [M7] Autonomous Options Trading Desk
+
+### Added
+- services/options: option schemas, Black–Scholes pricing + all five Greeks,
+  bisection implied volatility, IV rank/percentile, and deterministic
+  defined-risk strategy construction (bull put / bear call / iron condor /
+  cash-secured put). Pure functions, no network/LLM/execution authority.
+- services/risk: deterministic options risk engine — ten gates (defined risk,
+  max loss/trade, max total risk, concentration, vol-rank band, DTE window,
+  probability-of-profit, daily-loss circuit breaker, open-positions limit,
+  cash collateral) with hard vs soft semantics (hard → refuse, soft → reduce).
+- services/trading: autonomous agent (LLM proposes direction + thesis only;
+  deterministic code chooses strikes/size/strategy and runs risk gates), a
+  hash-chained audit journal, and a TradingDesk facade (open book, kill switch,
+  equity/account aggregation).
+- services/execution: Alpaca options adapter (paper-only) — option contracts,
+  option snapshots, multi-leg MLEG + single-leg orders, close position;
+  underlying price + historical bars for realized-vol/vol-rank.
+- API routes: /trading (status, decide, run, kill/resume, journal --verify,
+  equity, snapshot), /options/chain/{symbol}, and /playground/challenge
+  (SSE-streamed agent reasoning with injectable scenarios).
+- Web War Room (/trading) and Playground (/playground) with live WebSocket +
+  SSE streaming.
+- agnostix CLI (infra/scripts/agnostix.py): status / chain / decide / run /
+  journal --verify / kill with structured JSON output.
+- Migration 0007: hash-chained trading_journal table.
+
+### Security
+- ALPACA_PAPER=false is hard-refused at adapter construction; no live-money
+  path exists. The LLM never chooses a strike, size, strategy, or risk verdict.
+
+
 ## [M2] Fundamental AI Intelligence
 
 ### Added

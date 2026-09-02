@@ -25,6 +25,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     Text,
@@ -365,6 +366,33 @@ class AgentEvent(Base):
         Index("ix_agent_events_type_time", "event_type", "timestamp"),
         Index("ix_agent_events_agent_time", "agent_id", "timestamp"),
     )
+
+
+# ---------------------------------------------------------------------------
+# trading_journal (hash-chained, append-only audit ledger)
+# ---------------------------------------------------------------------------
+
+
+class TradingJournalEntry(Base):
+    """Append-only, tamper-evident record of every agent decision/refusal/order.
+
+    Each row commits to the previous row's hash; a judge can re-derive the
+    chain and detect any alteration. Never updated or deleted by application
+    code.
+    """
+
+    __tablename__ = "trading_journal"
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    seq: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    symbol: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    prev_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    hash: Mapped[str] = mapped_column(String(64), nullable=False)
 
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,8 @@ LLM research agents generate structured investment theses from real market and f
 - **Deterministic critic** — evidence existence, numerical traceability, and calibration checks are authoritative; an optional LLM reviewer can only *escalate*, never downgrade
 - **Multi-model evaluation harness** — every provider/model is evaluated against *one immutable context* (same version + hash), recording latency, tokens, cost, schema validity, and critic verdicts per run
 - **Provider-agnostic Model Gateway** — OpenRouter, OpenAI, Anthropic, Ollama (local), and any self-hosted OpenAI-compatible endpoint behind one registry; domain code has zero provider imports (test-enforced)
+- **Autonomous options trading desk** — the LLM proposes a direction + thesis; deterministic code builds a defined-risk strategy (bull put / bear call / iron condor / cash-secured put), sizes it, runs ten pure-math risk gates, and executes on Alpaca paper. Every decision, refusal, and order is hash-chained into a tamper-evident journal.
+- **Interactive war room + playground** — live equity curve, open strategies, kill switch, and a "challenge the agent" playground that streams the agent's full reasoning (market → signal → strategy → risk gates → verdict) over SSE, with injectable what-if scenarios.
 
 ---
 
@@ -139,9 +141,9 @@ All config flows through environment variables (see `.env.example`). Key groups:
 | M2 | Fundamental AI intelligence: research agent, critic, gateway, evaluation harness | ✅ Done |
 | M3 | Signal agents producing `TradeProposal`s | 🔜 Next |
 | M4 | Human approval gate wiring | Planned |
-| M5 | Deterministic quant risk engine | Planned |
-| M6 | Portfolio construction | Planned |
-| M7 | Paper execution via broker abstraction | Planned |
+| M5 | Deterministic quant risk engine | ✅ Done (options risk gates) |
+| M6 | Portfolio construction | Partial — desk book + equity snapshots |
+| M7 | Paper execution via broker abstraction | ✅ Done (options: chains, MLEG, paper) |
 
 ## Design Principles
 
