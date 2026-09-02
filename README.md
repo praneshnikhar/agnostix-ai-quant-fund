@@ -181,19 +181,6 @@ python -m infra.scripts.agnostix journal --verify  # verify the hash-chained led
 python -m infra.scripts.agnostix kill              # engage the kill switch
 ```
 
-## Roadmap
-
-| Milestone | Scope | Status |
-|---|---|---|
-| M0 | Foundation: infra, CI, auth scaffolding | ✅ Done |
-| M1 | Market intelligence: ingestion, provenance, freshness, `/markets` UI | ✅ Done |
-| M2 | Fundamental AI intelligence: research agent, critic, gateway, evaluation harness | ✅ Done |
-| M3 | Signal agents producing `TradeProposal`s | 🔜 Next |
-| M4 | Human approval gate wiring | Planned |
-| M5 | Deterministic quant risk engine | ✅ Done (options risk gates) |
-| M6 | Portfolio construction | Partial — desk book + equity snapshots |
-| M7 | Paper execution via broker abstraction | ✅ Done (options: chains, MLEG, paper) |
-
 ## Design Principles
 
 1. **Provenance everywhere** — every data record carries its source and timestamps; missing or stale inputs become explicit data gaps, never fabricated values
