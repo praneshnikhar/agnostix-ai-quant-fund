@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -147,7 +147,10 @@ class TradeRepository:
         if not rows:
             return 0
         stmt = pg_insert(TradeRecord).values(rows)
-        stmt = stmt.on_conflict_do_nothing(index_elements=["provider", "provider_trade_id"])
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=["provider", "provider_trade_id"],
+            index_where=text("provider_trade_id IS NOT NULL"),
+        )
         result = await self._session.execute(stmt)
         return int(getattr(result, "rowcount", 0) or 0)
 

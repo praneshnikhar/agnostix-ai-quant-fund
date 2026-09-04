@@ -351,7 +351,7 @@ def test_ollama_normalization_with_configured_host_and_model():
 
     assert captured["url"].startswith("http://gpu-box.internal:11434/api/chat")
     assert captured["body"]["model"] == "my-custom-local-model"
-    assert captured["body"]["format"] == "json"  # structured-output mode
+    assert captured["body"]["format"] == {"type": "object"}  # constrained structured output
     assert isinstance(out, ModelResponse)
     assert out.provider.value == "ollama"
     assert out.model == "qwen-local-tag"

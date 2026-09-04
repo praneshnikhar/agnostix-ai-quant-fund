@@ -296,7 +296,12 @@ def _repo_factory():
     @asynccontextmanager
     async def _cm():
         async with factory() as session:
-            yield session
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
 
     return _cm()
 

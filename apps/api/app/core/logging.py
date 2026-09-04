@@ -41,7 +41,7 @@ def configure_logging(level: str = "INFO", json_output: bool = True) -> None:
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
-        _redact_sensitive,
+        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
     ]
 
     renderer: structlog.typing.Processor = (
@@ -49,19 +49,32 @@ def configure_logging(level: str = "INFO", json_output: bool = True) -> None:
     )
 
     structlog.configure(
-        processors=[*shared_processors, renderer],
-        wrapper_class=structlog.make_filtering_bound_logger(
-            getattr(logging, level.upper(), logging.INFO)
-        ),
-        logger_factory=structlog.PrintLoggerFactory(file=sys.stdout),
+        processors=shared_processors,
+        wrapper_class=structlog.stdlib.BoundLogger,
+        logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
 
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=getattr(logging, level.upper(), logging.INFO),
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(
+        structlog.stdlib.ProcessorFormatter(
+            foreign_pre_chain=[
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.add_logger_name,
+                structlog.processors.TimeStamper(fmt="iso", utc=True),
+                structlog.processors.StackInfoRenderer(),
+                structlog.processors.format_exc_info,
+            ],
+            processors=[
+                structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+                _redact_sensitive,
+                renderer,
+            ],
+        )
     )
+    root = logging.getLogger()
+    root.handlers = [handler]
+    root.setLevel(getattr(logging, level.upper(), logging.INFO))
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:

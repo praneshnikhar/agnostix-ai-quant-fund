@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
 
     # --- Database / cache ---
-    database_url: str = "postgresql+asyncpg://fund:change-me-local-only@localhost:5432/fund"
+    database_url: str = "postgresql+asyncpg://fund:change-me-local-only@localhost:5433/fund"
     redis_url: str = "redis://localhost:6379/0"
 
     # --- Model gateway providers (all optional) ---
@@ -47,8 +47,10 @@ class Settings(BaseSettings):
     openrouter_api_key: str | None = None
     openrouter_model: str | None = None
     openrouter_timeout_seconds: float = 120.0
-    openrouter_max_retries: int = 2
-    openrouter_retry_backoff_seconds: float = 0.5
+    # Free-tier OpenRouter models are upstream-rate-limited (429) frequently;
+    # retry with backoff to ride out transient throttling.
+    openrouter_max_retries: int = 4
+    openrouter_retry_backoff_seconds: float = 1.5
     # Custom / self-hosted models (vLLM, TGI, OpenAI-compatible servers,
     # future fine-tuned Agnostix endpoints). Fully configurable; credentials
     # optional; initialized lazily only when this provider is requested.

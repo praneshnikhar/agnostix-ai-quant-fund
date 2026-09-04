@@ -30,7 +30,10 @@ export default function SymbolPage({
     queryFn: () => getSnapshot(symbol),
   });
 
-  const barList = bars.data?.bars ?? [];
+  // API returns bars newest-first; charts and last/prev need ascending order.
+  const barList = [...(bars.data?.bars ?? [])].sort(
+    (a, b) => new Date(a.event_time).getTime() - new Date(b.event_time).getTime()
+  );
   const last = barList[barList.length - 1];
   const prev = barList[barList.length - 2];
   const change = last && prev ? last.close - prev.close : null;

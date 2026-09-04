@@ -14,7 +14,7 @@ Data sources:
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from execution.broker.options_base import (
@@ -86,15 +86,15 @@ def _expiry_naive(value: Any) -> datetime | None:
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value
+        # Keep it tz-aware; downstream DTE/price math subtracts an aware now.
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
     try:
-        # expiration_date is a date (naive); combine with 16:00 ET market close
-        from datetime import time
-
+        # expiration_date is a date (naive); combine with ~16:00 ET market
+        # close, expressed as UTC so datetime arithmetic is consistent.
         d = value
         if hasattr(value, "date"):
             d = value.date()
-        return datetime.combine(d, time(16, 0))
+        return datetime(d.year, d.month, d.day, 20, 0, tzinfo=UTC)
     except Exception:  # noqa: BLE001
         return None
 
@@ -113,7 +113,12 @@ class AlpacaOptionsBroker(OptionsBroker):
     # -- reference data -----------------------------------------------------
 
     async def get_option_contracts(
-        self, underlying: str, *, expiration: datetime | None = None
+        self,
+        underlying: str,
+        *,
+        expiration: datetime | None = None,
+        min_dte: int = 0,
+        max_dte: int = 60,
     ) -> list[OptionContract]:
         from alpaca.trading.enums import AssetStatus
         from alpaca.trading.requests import GetOptionContractsRequest
@@ -121,10 +126,16 @@ class AlpacaOptionsBroker(OptionsBroker):
         kwargs: dict[str, Any] = {
             "underlying_symbols": [underlying.upper()],
             "status": AssetStatus.ACTIVE,
-            "limit": 1000,
+            "limit": 9999,
         }
         if expiration is not None:
             kwargs["expiration_date"] = expiration.date()
+        elif min_dte or max_dte:
+            # Alpaca returns only near-term contracts by default; constrain the
+            # request to the DTE window so the agent's expiry selection works.
+            today = _now().date()
+            kwargs["expiration_date_gte"] = today + timedelta(days=min_dte)
+            kwargs["expiration_date_lte"] = today + timedelta(days=max_dte)
 
         def _fetch() -> list[OptionContract]:
             req = GetOptionContractsRequest(**kwargs)
@@ -158,17 +169,25 @@ class AlpacaOptionsBroker(OptionsBroker):
             return {}
         from alpaca.data.requests import OptionSnapshotRequest
 
-        def _fetch() -> dict[str, OptionQuote]:
-            req = OptionSnapshotRequest(symbol_or_symbols=symbols)
+        BATCH = 100  # Alpaca option snapshot API limits each request to 100 symbols
+
+        def _fetch_batch(batch: list[str]) -> dict[str, OptionQuote]:
+            req = OptionSnapshotRequest(symbol_or_symbols=batch)
             resp = self._option_data.get_option_snapshot(req)
             out: dict[str, OptionQuote] = {}
-            for sym in symbols:
+            for sym in batch:
                 snap = self._snapshot_for(resp, sym)
                 if snap is None:
                     continue
                 quote = self._snapshot_to_quote(sym, snap)
                 if quote is not None:
                     out[sym] = quote
+            return out
+
+        def _fetch() -> dict[str, OptionQuote]:
+            out: dict[str, OptionQuote] = {}
+            for i in range(0, len(symbols), BATCH):
+                out.update(_fetch_batch(symbols[i : i + BATCH]))
             return out
 
         return await asyncio.to_thread(_fetch)
@@ -178,6 +197,17 @@ class AlpacaOptionsBroker(OptionsBroker):
         if isinstance(resp, dict):
             return resp.get(symbol)
         return None
+
+    @staticmethod
+    def _occ_strike(symbol: str) -> float | None:
+        """Parse the strike (×1000, 8 digits) from an OCC option symbol.
+
+        e.g. "SPY260903C00420000" -> 420.0. Returns None for malformed symbols.
+        """
+        digits = symbol[-8:]
+        if not digits.isdigit():
+            return None
+        return float(int(digits)) / 1000.0
 
     def _snapshot_to_quote(self, symbol: str, snap: Any) -> OptionQuote | None:
         quote = getattr(snap, "latest_quote", None)
@@ -189,9 +219,12 @@ class AlpacaOptionsBroker(OptionsBroker):
         else:
             last = None
         greeks = getattr(snap, "greeks", None)
+        strike = self._occ_strike(symbol)
+        if strike is None:
+            return None
         return OptionQuote(
             symbol=symbol,
-            strike=float(getattr(snap, "strike_price", 0) or 0),
+            strike=strike,
             bid=float(bid) if bid is not None else None,
             ask=float(ask) if ask is not None else None,
             last=float(last) if last is not None else None,
@@ -218,18 +251,26 @@ class AlpacaOptionsBroker(OptionsBroker):
 
         def _submit() -> OptionOrderStatus:
             if request.mleg and request.num_legs > 1:
+                # Alpaca MLEG requires relatively-prime leg ratios: leg qty is
+                # expressed as a ratio (1:1 for spreads) and the order `qty` is
+                # the number of multi-leg units. Reduce by the GCD so equal legs
+                # submit as 1:1 rather than the raw (non-prime) contract count.
+                import math
+
+                gcd = math.gcd(*request.quantities) or 1
+                ratios = [int(q // gcd) for q in request.quantities]
                 legs = [
                     OptionLegRequest(
                         symbol=leg.symbol,
                         side=OrderSide.BUY if side.value.startswith("buy") else OrderSide.SELL,
-                        ratio_qty=qty,
+                        ratio_qty=ratio,
                     )
-                    for leg, side, qty in zip(
-                        request.legs, request.sides, request.quantities, strict=False
+                    for leg, side, ratio in zip(
+                        request.legs, request.sides, ratios, strict=False
                     )
                 ]
                 order = MarketOrderRequest(
-                    qty=sum(request.quantities),
+                    qty=gcd,
                     order_class=OrderClass.MLEG,
                     time_in_force=TimeInForce.DAY,
                     legs=legs,

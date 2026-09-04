@@ -176,7 +176,9 @@ class TradingAgent:
             spot = history[-1]
         rv = realized_volatility(history)
         vrank = volatility_rank(rv, history)
-        contracts = await self._broker.get_option_contracts(symbol)
+        contracts = await self._broker.get_option_contracts(
+            symbol, min_dte=self._min_dte, max_dte=self._max_dte
+        )
         expiration = select_expiration(contracts, self._min_dte, self._max_dte)
         chain = await self._build_chain(symbol, spot, contracts, expiration)
         return {

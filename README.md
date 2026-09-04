@@ -92,6 +92,8 @@ Prerequisites: Docker, Python 3.12, Node 20.
 ```bash
 git clone <repo-url> && cd agnostix-ai-quant-fund
 
+python3.12 -m venv .venv && source .venv/bin/activate   # required by make commands
+pip install -r requirements.txt                          # or: uv pip install -r requirements.txt
 cp .env.example .env          # then edit .env and add your keys (below)
 make dev                      # docker compose up --build (postgres, redis, api, worker, web)
 ```
@@ -100,7 +102,7 @@ In a second terminal, apply migrations + seed:
 
 ```bash
 make migrate                  # alembic upgrade head
-make seed
+make seed                     # admin user
 ```
 
 | Service | URL |
@@ -139,10 +141,12 @@ All config flows through environment variables (see `.env.example`). **The API r
 The minimum working `.env`:
 
 ```bash
-# LLM — OpenRouter free tier works (use any ":free" model id)
-API_OPENROUTER_API_KEY=sk-or-v1-...
-API_OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free
-# ...or any one of: API_OPENAI_API_KEY / API_ANTHROPIC_API_KEY / API_OLLAMA_BASE_URL
+# LLM — any one of these is enough; the gateway picks the first configured.
+# Local Ollama (free, reliable — recommended for demos):
+API_OLLAMA_BASE_URL=http://host.docker.internal:11434   # host Ollama from inside Docker
+API_OLLAMA_MODEL=llama3.2:3b
+# ...or cloud providers: API_OPENROUTER_API_KEY + API_OPENROUTER_MODEL,
+#    API_OPENAI_API_KEY, API_ANTHROPIC_API_KEY
 
 # Alpaca — PAPER TRADING ONLY (fresh $100k paper account)
 API_ALPACA_API_KEY=<paper key id>
@@ -150,11 +154,15 @@ API_ALPACA_SECRET_KEY=<paper secret>
 API_ALPACA_PAPER=true
 ```
 
+> **Ollama setup:** `brew install ollama && ollama pull llama3.2:3b && ollama serve`. The API container reaches the host Ollama via `host.docker.internal`; for a host-only run use `API_OLLAMA_BASE_URL=http://localhost:11434`.
+
+> **Paper options orders** are only accepted by Alpaca during regular US market hours (9:30 AM–4 PM ET). Outside those hours the desk still runs signals → strategy → risk gates, but execution is rejected — this is expected. Dry-runs and the Playground work 24/7.
+
 | Group | Variables |
 |---|---|
 | Database / Redis | `API_DATABASE_URL`, `API_REDIS_URL` |
 | Alpaca (paper) | `API_ALPACA_API_KEY`, `API_ALPACA_SECRET_KEY`, `API_ALPACA_PAPER=true`, `API_ALPACA_MCP_URL` *(server-side only, never exposed to the frontend)* |
-| Model Gateway | `API_OPENROUTER_API_KEY` + `API_OPENROUTER_MODEL`, `API_OPENAI_API_KEY`, `API_ANTHROPIC_API_KEY`, `API_OLLAMA_BASE_URL` — gateway uses whichever is set |
+| Model Gateway | `API_OPENROUTER_API_KEY` + `API_OPENROUTER_MODEL`, `API_OPENAI_API_KEY`, `API_ANTHROPIC_API_KEY`, `API_OLLAMA_BASE_URL` + `API_OLLAMA_MODEL` — gateway uses whichever is set |
 | Security | `AUTH_SECRET`, `API_PROVIDER_ENCRYPTION_KEY` (Fernet key for provider credentials at rest) |
 
 ## Common Commands
@@ -169,13 +177,27 @@ make format      # ruff format + autofix
 make typecheck   # TypeScript, apps/web
 ```
 
+> `make` uses `.venv/bin/python` by default (`PY ?= .venv/bin/python`). Override with `make migrate PY=python3.12`.
+
+### Market-data ingestion CLI
+
+The Celery ingestion worker is opt-in; for an instant local demo, ingest the watchlist directly:
+
+```bash
+python -m infra.scripts.ingest_market_data                 # all datatypes, default watchlist
+python -m infra.scripts.ingest_market_data --symbols AAPL,MSFT
+python -m infra.scripts.ingest_market_data --skip-news
+```
+
+Fetches securities, bars, quotes, trades, and news from Alpaca (paper/IEX) with per-datatype error isolation. Reads credentials from `API_ALPACA_API_KEY` / `API_ALPACA_SECRET_KEY`.
+
 ### Trading desk CLI
 
 ```bash
 python -m infra.scripts.agnostix status            # desk status + account
 python -m infra.scripts.agnostix chain SPY         # enriched option chain
 python -m infra.scripts.agnostix decide AAPL       # one decision (dry-run)
-python -m infra.scripts.agnostix decide AAPL --execute   # place a paper order
+python -m infra.scripts.agnostix decide AAPL --execute   # place a paper order (market hours only)
 python -m infra.scripts.agnostix run SPY AAPL      # run a cycle
 python -m infra.scripts.agnostix journal --verify  # verify the hash-chained ledger
 python -m infra.scripts.agnostix kill              # engage the kill switch

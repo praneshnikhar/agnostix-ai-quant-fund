@@ -51,7 +51,12 @@ class OptionsBroker(ABC):
 
     @abstractmethod
     async def get_option_contracts(
-        self, underlying: str, *, expiration: datetime | None = None
+        self,
+        underlying: str,
+        *,
+        expiration: datetime | None = None,
+        min_dte: int = 0,
+        max_dte: int = 60,
     ) -> list[OptionContract]: ...
 
     @abstractmethod

@@ -1,7 +1,7 @@
 """Provider configuration management with encrypted credential material.
 
 Revision ID: 0006
-Revises: 0005
+Revises: 0004
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from alembic import op
 from sqlalchemy.dialects import postgresql as pg
 
 revision: str = "0006"
-down_revision: str | None = "0005"
+down_revision: str | None = "0004"
 branch_labels: str | None = None
 depends_on: str | None = None
 

@@ -24,7 +24,7 @@ class FakeOptionsBroker(OptionsBroker):
         self.orders: list[OptionOrderRequest] = []
         self._expiry = datetime.now(UTC) + timedelta(days=30)
 
-    async def get_option_contracts(self, underlying, *, expiration=None):
+    async def get_option_contracts(self, underlying, *, expiration=None, min_dte=0, max_dte=60):
         contracts = []
         for strike in [95.0, 97.0, 100.0, 102.0, 105.0]:
             contracts.append(

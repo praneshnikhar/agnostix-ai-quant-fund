@@ -35,6 +35,11 @@ export function CandleChart({ bars, height = 320 }: Props) {
       crosshair: { mode: 0 },
     });
 
+    // lightweight-charts requires strictly ascending time order.
+    const sorted = [...bars].sort(
+      (a, b) => new Date(a.event_time).getTime() - new Date(b.event_time).getTime()
+    );
+
     const candles = chart.addCandlestickSeries({
       upColor: "#26a69a",
       downColor: "#ef5350",
@@ -43,7 +48,7 @@ export function CandleChart({ bars, height = 320 }: Props) {
       borderVisible: false,
     });
     candles.setData(
-      bars.map((b) => ({
+      sorted.map((b) => ({
         time: Math.floor(new Date(b.event_time).getTime() / 1000) as UTCTimestamp,
         open: b.open,
         high: b.high,
@@ -58,7 +63,7 @@ export function CandleChart({ bars, height = 320 }: Props) {
     });
     chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
     volume.setData(
-      bars.map((b) => ({
+      sorted.map((b) => ({
         time: Math.floor(new Date(b.event_time).getTime() / 1000) as UTCTimestamp,
         value: b.volume,
         color: b.close >= b.open ? "rgba(38,166,154,0.4)" : "rgba(239,83,80,0.4)",

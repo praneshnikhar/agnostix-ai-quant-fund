@@ -83,8 +83,10 @@ class OllamaAdapter(ProviderAdapter):
         if options:
             payload["options"] = options
         if request.response_schema is not None:
-            # Structured-output instruction: JSON mode + explicit schema hint.
-            payload["format"] = "json"
+            # Constrained structured output: pass the JSON Schema to Ollama's
+            # `format` so the model is forced to emit conformant JSON, plus a
+            # plain-language schema hint for value quality.
+            payload["format"] = request.response_schema
             schema_json = json.dumps(request.response_schema, sort_keys=True)
             messages.append(
                 {

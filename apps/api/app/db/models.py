@@ -34,6 +34,22 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
+
+
+class NumericFloat(TypeDecorator):
+    """Numeric column that yields ``float`` on read instead of ``Decimal``.
+
+    Pydantic v2 / FastAPI serializes ``Decimal`` as a JSON string in response
+    models, which breaks the frontend's ``number`` contract (``.toFixed()``
+    crashes). The DB column stays ``numeric``; only the result value changes.
+    """
+
+    impl = Numeric
+    cache_ok = True
+
+    def process_result_value(self, value, dialect):
+        return float(value) if value is not None else None
 
 
 class Base(DeclarativeBase):
@@ -224,11 +240,11 @@ class Proposal(Base):
     direction: Mapped[str] = mapped_column(String(16), nullable=False)  # long|short
     thesis: Mapped[str] = mapped_column(Text, nullable=False)
     evidence: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
-    entry_price: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    stop_loss: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    take_profit: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    size_pct_portfolio: Mapped[float | None] = mapped_column(Numeric(10, 6))
-    confidence: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    entry_price: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    stop_loss: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    take_profit: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    size_pct_portfolio: Mapped[float | None] = mapped_column(NumericFloat(10, 6))
+    confidence: Mapped[float | None] = mapped_column(NumericFloat(5, 4))
     status: Mapped[str] = mapped_column(
         String(32), default=ProposalStatus.PENDING_CRITIC.value, index=True
     )
@@ -294,8 +310,8 @@ class Order(Base, TimestampMixin):
     )
     alpaca_order_id: Mapped[str | None] = mapped_column(Text, index=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
-    filled_price: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    filled_qty: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    filled_price: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    filled_qty: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -310,10 +326,10 @@ class Position(Base):
     __tablename__ = "positions"
 
     symbol: Mapped[str] = mapped_column(Text, primary_key=True)
-    qty: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
-    avg_entry_price: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
-    current_price: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    unrealized_pl: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    qty: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
+    avg_entry_price: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
+    current_price: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    unrealized_pl: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -334,11 +350,11 @@ class PortfolioSnapshot(Base):
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
-    equity: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
-    cash: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
-    daily_pl: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    drawdown_pct: Mapped[float | None] = mapped_column(Numeric(10, 6))
-    benchmark_return_pct: Mapped[float | None] = mapped_column(Numeric(10, 6))
+    equity: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
+    cash: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
+    daily_pl: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    drawdown_pct: Mapped[float | None] = mapped_column(NumericFloat(10, 6))
+    benchmark_return_pct: Mapped[float | None] = mapped_column(NumericFloat(10, 6))
 
 
 # ---------------------------------------------------------------------------
@@ -433,13 +449,13 @@ class MarketBar(Base):
     symbol: Mapped[str] = mapped_column(Text, nullable=False)
     timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
     event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    open: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
-    high: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
-    low: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
-    close: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
-    volume: Mapped[float] = mapped_column(Numeric(24, 8), nullable=False)
+    open: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
+    high: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
+    low: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
+    close: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
+    volume: Mapped[float] = mapped_column(NumericFloat(24, 8), nullable=False)
     trade_count: Mapped[int | None]
-    vwap: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    vwap: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     stored_at: Mapped[datetime] = mapped_column(
@@ -469,11 +485,11 @@ class Quote(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     symbol: Mapped[str] = mapped_column(Text, nullable=False)
     event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    bid_price: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    bid_size: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    ask_price: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    ask_size: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    last_price: Mapped[float | None] = mapped_column(Numeric(18, 8))
+    bid_price: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    bid_size: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    ask_price: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    ask_size: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    last_price: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     stored_at: Mapped[datetime] = mapped_column(
@@ -491,8 +507,8 @@ class TradeRecord(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     symbol: Mapped[str] = mapped_column(Text, nullable=False)
     event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    price: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
-    size: Mapped[float] = mapped_column(Numeric(18, 8), nullable=False)
+    price: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
+    size: Mapped[float] = mapped_column(NumericFloat(18, 8), nullable=False)
     conditions: Mapped[list | None] = mapped_column(JSONB)
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     provider_trade_id: Mapped[str | None] = mapped_column(Text)
@@ -599,7 +615,7 @@ class FinancialMetricRecord(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     symbol: Mapped[str] = mapped_column(Text, nullable=False)
     metric: Mapped[str] = mapped_column(Text, nullable=False)
-    value: Mapped[float | None] = mapped_column(Numeric(24, 8))
+    value: Mapped[float | None] = mapped_column(NumericFloat(24, 8))
     period_type: Mapped[str] = mapped_column(String(16), nullable=False)
     period_end: Mapped[date] = mapped_column(Date(), nullable=False)
     fiscal_year: Mapped[int | None]
@@ -679,10 +695,10 @@ class EarningsEventRecord(Base):
     period_end: Mapped[date] = mapped_column(Date(), nullable=False)
     fiscal_year: Mapped[int | None]
     fiscal_quarter: Mapped[int | None]
-    eps_actual: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    eps_estimate: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    revenue_actual: Mapped[float | None] = mapped_column(Numeric(24, 8))
-    revenue_estimate: Mapped[float | None] = mapped_column(Numeric(24, 8))
+    eps_actual: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    eps_estimate: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    revenue_actual: Mapped[float | None] = mapped_column(NumericFloat(24, 8))
+    revenue_estimate: Mapped[float | None] = mapped_column(NumericFloat(24, 8))
     currency: Mapped[str] = mapped_column(String(8), default="USD")
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     provider_record_id: Mapped[str | None] = mapped_column(Text)
@@ -707,14 +723,14 @@ class ValuationSnapshotRecord(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     symbol: Mapped[str] = mapped_column(Text, nullable=False)
     as_of: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    price: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    market_cap: Mapped[float | None] = mapped_column(Numeric(24, 8))
-    pe_ratio: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    forward_pe: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    ps_ratio: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    ev_ebitda: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    fcf_yield: Mapped[float | None] = mapped_column(Numeric(18, 8))
-    shares_outstanding: Mapped[float | None] = mapped_column(Numeric(24, 8))
+    price: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    market_cap: Mapped[float | None] = mapped_column(NumericFloat(24, 8))
+    pe_ratio: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    forward_pe: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    ps_ratio: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    ev_ebitda: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    fcf_yield: Mapped[float | None] = mapped_column(NumericFloat(18, 8))
+    shares_outstanding: Mapped[float | None] = mapped_column(NumericFloat(24, 8))
     currency: Mapped[str] = mapped_column(String(8), default="USD")
     provider: Mapped[str] = mapped_column(Text, nullable=False)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

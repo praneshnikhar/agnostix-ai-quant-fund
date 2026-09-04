@@ -45,10 +45,12 @@ class AlpacaNewsProvider(NewsProvider):
         received = datetime.now(UTC)
         params: dict = {"limit": limit}
         if symbols:
-            params["symbols"] = [s.upper() for s in symbols]
+            params["symbols"] = ",".join(s.upper() for s in symbols)
             params["start"] = received - timedelta(days=7)
         try:
-            resp = self._client.get_news(params)  # type: ignore[attr-defined]
+            from alpaca.data.historical.news import NewsRequest
+
+            resp = self._client.get_news(NewsRequest(**params))  # type: ignore[attr-defined]
         except Exception as exc:
             raise ProviderError(f"news fetch failed: {exc}") from exc
         rows = getattr(resp, "news", None)

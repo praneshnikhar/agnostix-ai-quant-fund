@@ -6,6 +6,11 @@
 
 .PHONY: dev build test lint format typecheck migrate seed down verify
 
+# Use the project's Python 3.12 venv so `make` works regardless of the active
+# shell environment (e.g. a conda base env on Python 3.10). Override with:
+#   make migrate PY=python3.12
+PY ?= .venv/bin/python
+
 dev:
 	docker compose up --build
 
@@ -13,24 +18,24 @@ build:
 	docker compose build
 
 test:
-	pytest apps/api/tests tests/integration -v
+	$(PY) -m pytest apps/api/tests tests/integration -v
 
 lint:
-	ruff check apps/api services
-	mypy apps/api/app services --ignore-missing-imports || true
+	$(PY) -m ruff check apps/api services
+	$(PY) -m mypy apps/api/app services --ignore-missing-imports || true
 
 format:
-	ruff format apps/api services
-	ruff check --fix apps/api services
+	$(PY) -m ruff format apps/api services
+	$(PY) -m ruff check --fix apps/api services
 
 typecheck:
 	cd apps/web && npx tsc --noEmit
 
 migrate:
-	alembic upgrade head
+	$(PY) -m alembic upgrade head
 
 seed:
-	python -m db.seeds.seed
+	$(PY) -m db.seeds.seed
 
 down:
 	docker compose down

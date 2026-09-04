@@ -65,14 +65,9 @@ class AlpacaMarketDataProvider(MarketDataProvider):
         secret = secret_key or os.environ.get("ALPACA_API_SECRET_KEY")
         if not key or not secret:
             raise ProviderError("ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY not set")
-        feed = feed or os.environ.get("ALPACA_DATA_FEED", "iex")  # iex = free paper feed
-        # alpaca-py accepts the feed under different kwarg names across
-        # versions; try both.
-        kwargs: dict = {"api_key": key, "secret_key": secret}
-        try:
-            return StockHistoricalDataClient(**kwargs, data_feed=feed)  # type: ignore[call-arg]
-        except TypeError:
-            return StockHistoricalDataClient(**kwargs, feed=feed)  # type: ignore[call-arg]
+        # alpaca-py >= 0.44 sets the data feed per-request (see _request /
+        # get_latest_quote), not on the client constructor.
+        return StockHistoricalDataClient(api_key=key, secret_key=secret)
 
     # -- bars ---------------------------------------------------------------
 
@@ -109,19 +104,19 @@ class AlpacaMarketDataProvider(MarketDataProvider):
 
     def get_latest_quote(self, symbol: str) -> Quote | None:
         received = _now()
+        feed = self._feed or os.environ.get("ALPACA_DATA_FEED", "iex")
         try:
+            from alpaca.data.requests import StockLatestQuoteRequest
+
             resp = self._client.get_stock_latest_quote(  # type: ignore[attr-defined]
-                {
-                    "symbols": [symbol.upper()],
-                    "feed": self._feed or os.environ.get("ALPACA_DATA_FEED", "iex"),
-                }
+                StockLatestQuoteRequest(symbol_or_symbols=[symbol.upper()], feed=feed)
             )
         except Exception as exc:
             raise ProviderError(f"quote fetch failed for {symbol}: {exc}") from exc
-        raw = self._extract(resp, symbol)
-        if not raw:
+        quote = self._single(resp, symbol)
+        if quote is None:
             return None
-        first = dict(raw[0])
+        first = self._as_dict(quote)
         first.setdefault("S", symbol)
         return normalize_quote(first, provider=PROVIDER, received_at=received)
 
@@ -131,15 +126,24 @@ class AlpacaMarketDataProvider(MarketDataProvider):
         received = _now()
         end = received
         start = end - timedelta(days=1)
+        feed = self._feed or os.environ.get("ALPACA_DATA_FEED", "iex")
         try:
+            from alpaca.data.requests import StockTradesRequest
+
             resp = self._client.get_stock_trades(  # type: ignore[attr-defined]
-                self._request(symbol, "1Min", start, end, limit)
+                StockTradesRequest(
+                    symbol_or_symbols=symbol.upper(), start=start, end=end, limit=limit, feed=feed
+                )
             )
         except Exception as exc:
             raise ProviderError(f"trades fetch failed for {symbol}: {exc}") from exc
         trades: list[Trade] = []
         for raw in self._extract(resp, symbol)[-limit:]:
             raw = dict(raw)
+            # alpaca's `id` is a per-response sequence number, not a stable
+            # trade identifier — treating it as a provider_trade_id would
+            # collide across symbols.
+            raw.pop("id", None)
             raw.setdefault("S", symbol)
             trades.append(normalize_trade(raw, provider=PROVIDER, received_at=received))
         return trades
@@ -198,7 +202,7 @@ class AlpacaMarketDataProvider(MarketDataProvider):
                 if timeframe == "1Min"
                 else (TimeFrame.Hour if timeframe == "1Hour" else TimeFrame.Day),
             )
-            from alpaca.data.models import DataFeed  # type: ignore[attr-defined]
+            from alpaca.data.enums import DataFeed
 
             req = StockBarsRequest(
                 symbol_or_symbols=symbol.upper(),
@@ -235,10 +239,32 @@ class AlpacaMarketDataProvider(MarketDataProvider):
             rows = []
         out: list[dict] = []
         for row in rows:
-            if isinstance(row, dict):
-                out.append(row)
-            else:  # alpaca-py model objects -> attribute dump
-                out.append(
-                    {k: v for k, v in vars(row).items() if not k.startswith("_") and v is not None}
-                )
+            out.append(AlpacaMarketDataProvider._as_dict(row))
         return out
+
+    @staticmethod
+    def _as_dict(row: object) -> dict:
+        """Convert an alpaca-py model (or dict) to a plain dict."""
+        if isinstance(row, dict):
+            return dict(row)
+        dump = getattr(row, "model_dump", None)
+        if callable(dump):
+            return dump()
+        return {k: v for k, v in vars(row).items() if not k.startswith("_") and v is not None}
+
+    @staticmethod
+    def _single(resp: object, symbol: str) -> object | None:
+        """Extract the single per-symbol model from a {symbol: model} response.
+
+        Some SDK shapes wrap the model in a one-element list; unwrap it.
+        """
+        if isinstance(resp, dict):
+            data = resp
+        else:
+            data = getattr(resp, "data", resp)
+        if isinstance(data, dict):
+            item = data.get(symbol.upper())
+            if isinstance(item, list):
+                return item[0] if item else None
+            return item
+        return None

@@ -14,16 +14,21 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 FROM node:20-alpine AS runner
+
 WORKDIR /workspace/apps/web
+
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=builder /workspace/packages /workspace/packages
 COPY --from=builder --chown=node:node /workspace/apps/web/.next ./.next
+COPY --from=builder /workspace/apps/web/node_modules ./node_modules
 COPY --from=builder /workspace/apps/web/public ./public
 COPY --from=builder /workspace/apps/web/package.json ./package.json
 COPY --from=builder /workspace/apps/web/next.config.mjs ./next.config.mjs
 
 USER node
+
 EXPOSE 3000
-CMD ["npx", "next", "start"]
+
+CMD ["./node_modules/.bin/next", "start"]

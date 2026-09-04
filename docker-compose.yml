@@ -14,7 +14,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
       POSTGRES_DB: ${POSTGRES_DB:-fund}
     ports:
-      - "5432:5432"
+      # Host port 5433 to avoid clashing with a locally installed postgres
+      # on 5432. In-container connections use the `postgres:5432` service name.
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -73,7 +75,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: celery -A app.worker.celery_app worker --loglevel=INFO --app-dir apps/api
+    command: celery -A app.worker.celery_app worker --loglevel=INFO
     volumes:
       - ./apps/api:/workspace/apps/api
       - ./services:/workspace/services
