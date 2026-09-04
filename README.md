@@ -4,6 +4,7 @@
 
 LLM research agents generate structured investment theses from real market and fundamental data — checked by deterministic grounding engines, benchmarked across model providers on identical contexts, and gated behind a mandatory human approval step.
 
+
 ---
 
 ## Highlights
